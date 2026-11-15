@@ -5,10 +5,14 @@
 #   Sporthive (tools/sporthive-sync.js) and publishes them. The refreshed results are kept in the
 #   workflow cache, not committed, so only the owner ever changes the repository.
 # - On demand from the Actions tab ("Run workflow"), which also refreshes the results.
+# - On pull requests (e.g. Claude's proposed updates): tests and builds only, never publishes.
+#   Changes reach the live site only when the owner merges the pull request into main.
 name: Test and deploy
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   schedule:
     - cron: '13 21 * * 0'
@@ -24,7 +28,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Pull requests: check the proposed change (no access to publish)
+  check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm test
+      - run: npm run build
+
   deploy:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

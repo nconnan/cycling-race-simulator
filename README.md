@@ -1,6 +1,8 @@
 # Cycling Race Simulator v11
 
-**© Nicholas J. F. Connan. All rights reserved.** See [LICENSE](LICENSE). Only the owner may change this repository; the automated workflow has read-only access.
+**© Nicholas J. F. Connan. All rights reserved.** See [LICENSE](LICENSE).
+
+**Who can change this repository:** only the owner updates `main`, which is what the live site is built from. Claude can push only to `claude/…` branches and propose changes as pull requests. Each pull request is tested automatically, and goes live only when the owner merges it. The automated workflow has read-only access. Repository rulesets enforce this; see *Repository protection* below.
 
 Plan graded cycling races: predict when grades catch each other, plan start gaps that avoid catches, and print a race-day sheet for the commissaire.
 
@@ -153,3 +155,12 @@ npm run serve     # local server on http://localhost:8080
 - The planner uses whole-minute starts. It checks every pair of grades at their nominal speeds and, when ranges are allowed for, at the fastest and slowest speed in each range. Under the "final N laps" rule, catches earlier in the race are allowed. With the neutralise or join-the-bunch rules, those earlier catches can change later timings, so check the Catch log after applying a plan.
 
 Predictions are for planning only. They don't account for terrain, weather, crashes or tactics.
+
+## Repository protection
+
+Two branch rulesets (Settings → Rules → Rulesets), both with **Repository admin** on the bypass list (the owner):
+
+1. **Main: owner only:** target the default branch; Restrict updates, Restrict deletions, Block force pushes. Only the owner can update `main`, including by merging pull requests.
+2. **Branches: Claude's work branches only:** target all branches, excluding the default branch and `claude/**`; Restrict creations, Restrict updates, Restrict deletions. Nobody but the owner can make other branches.
+
+Claude's GitHub app keeps write access, so it can push `claude/…` branches and open pull requests, but it can't update `main`. Collaborators: none. Use two-factor authentication on the owner's account.
