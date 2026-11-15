@@ -1,7 +1,9 @@
-# Tests and publishes the app to GitHub Pages.
+# Tests and publishes the app to GitHub Pages. This workflow never changes the code:
+# it has read-only access to the repository.
 # - On every push to main.
-# - Every Monday about 5:15 am Perth time (Sunday 21:13 UTC): first refreshes the clubs'
-#   results from Sporthive (tools/sporthive-sync.js), saves them to the repository, then publishes.
+# - Every Monday about 5:15 am Perth time (Sunday 21:13 UTC): refreshes the clubs' results from
+#   Sporthive (tools/sporthive-sync.js) and publishes them. The refreshed results are kept in the
+#   workflow cache, not committed, so only the owner ever changes the repository.
 # - On demand from the Actions tab ("Run workflow"), which also refreshes the results.
 name: Test and deploy
 
@@ -13,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -33,26 +35,28 @@ jobs:
         with:
           node-version: 22
 
+      - name: Restore the latest club results
+        uses: actions/cache/restore@v6
+        with:
+          path: .sporthive-cache
+          key: sporthive-history-${{ github.run_id }}
+          restore-keys: sporthive-history-
+      - name: Use the newer club results (cache or repository)
+        run: node tools/pick-history.js
+
       - name: Refresh club results from Sporthive
-        id: sync
         if: github.event_name != 'push'
         run: node tools/sporthive-sync.js
 
       - run: npm test
       - run: npm run build
 
-      - name: Save refreshed results
-        if: github.event_name != 'push'
-        run: |
-          if git diff --quiet -- js/history-data.js; then
-            echo "No new races."
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add js/history-data.js dist/
-            git commit -m "Update club results from Sporthive (${{ steps.sync.outputs.new_races }} new races)"
-            git push
-          fi
+      - name: Keep the club results for next time
+        run: mkdir -p .sporthive-cache && cp js/history-data.js .sporthive-cache/history-data.js
+      - uses: actions/cache/save@v6
+        with:
+          path: .sporthive-cache
+          key: sporthive-history-${{ github.run_id }}
 
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5

@@ -1,0 +1,12 @@
+Copyright (c) 2025–2026 Nicholas J. F. Connan. All rights reserved.
+
+This software, including its source code, data files, design and documentation, is the property of
+the copyright holder. No permission is granted to copy, modify, merge, publish, distribute,
+sublicense or sell it, in whole or in part, or to create derivative works from it, without the
+prior written permission of the copyright holder.
+
+You may use the published application at https://nconnan.github.io/cycling-race-simulator/ for
+planning races. Viewing the source in this repository does not grant any licence to it.
+
+Third-party components keep their own licences: the Inter and JetBrains Mono fonts in fonts/ are
+under the SIL Open Font License 1.1. Race results data comes from MYLAPS Sporthive.

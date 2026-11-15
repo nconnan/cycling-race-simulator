@@ -1,5 +1,7 @@
 # Cycling Race Simulator v11
 
+**© Nicholas J. F. Connan. All rights reserved.** See [LICENSE](LICENSE). Only the owner may change this repository; the automated workflow has read-only access.
+
 Plan graded cycling races: predict when grades catch each other, plan start gaps that avoid catches, and print a race-day sheet for the commissaire.
 
 ## What's in v11
@@ -18,7 +20,7 @@ Plan graded cycling races: predict when grades catch each other, plan start gaps
 
 - **Weekly update:** every Monday at about 5:15 am Perth time, GitHub runs `tools/sporthive-sync.js`.
   - It reads each listed club's new races from Sporthive (MYLAPS) and adds their grade speeds to `js/history-data.js` (speeds only, no names).
-  - It runs the tests, saves the data and republishes the app.
+  - It runs the tests and republishes the app with the new data. The data is kept in the workflow's cache, not committed, so the workflow never changes the code (it has read-only access). New races appear on the live site; the copy in the repository only changes when the owner updates it.
   - A week with nothing new makes about 6 requests to Sporthive. Races published twice (same day, course and results) are kept once.
   - If Sporthive can't be read, the run fails, GitHub emails the repository owner, and the app keeps the last data.
 - **Update now:** in the repository's **Actions** tab, choose **Test and deploy**, then **Run workflow**.
