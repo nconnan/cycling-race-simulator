@@ -1,19 +1,25 @@
-# Publishes the app to GitHub Pages on every push to main, after the tests pass.
+# Tests and publishes the app to GitHub Pages.
+# - On every push to main.
+# - Every Monday about 5:15 am Perth time (Sunday 21:13 UTC): first refreshes the clubs'
+#   results from Sporthive (tools/sporthive-sync.js), saves them to the repository, then publishes.
+# - On demand from the Actions tab ("Run workflow"), which also refreshes the results.
 name: Test and deploy
 
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: '13 21 * * 0'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -26,8 +32,28 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+
+      - name: Refresh club results from Sporthive
+        id: sync
+        if: github.event_name != 'push'
+        run: node tools/sporthive-sync.js
+
       - run: npm test
       - run: npm run build
+
+      - name: Save refreshed results
+        if: github.event_name != 'push'
+        run: |
+          if git diff --quiet -- js/history-data.js; then
+            echo "No new races."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add js/history-data.js dist/
+            git commit -m "Update club results from Sporthive (${{ steps.sync.outputs.new_races }} new races)"
+            git push
+          fi
+
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

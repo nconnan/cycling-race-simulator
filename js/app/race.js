@@ -508,6 +508,7 @@ function updateCourseSetup() {
   updatePlaybackHint();
   updateCourseUI();
   renderPlannerLocks();
+  renderClubSelect();
   renderHistoryCourseSelect();
   renderHistory();
   renderReview();

@@ -733,3 +733,15 @@ select {
   .view-toggle { margin-left: 0; }
   .timeline-wrap { margin: 0 12px; }
 }
+
+/* Clubs and latest club races */
+.add-club-steps { margin: 0 0 10px; padding-left: 20px; color: var(--text-2); line-height: 1.55; }
+.add-club-steps li { margin-bottom: 4px; }
+#club-line { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
+.latest-races { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.latest-race { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); flex-wrap: wrap; }
+.lr-main { flex: 1; min-width: 200px; }
+.lr-name { font-weight: 700; }
+.lr-meta { font-size: 12px; color: var(--muted); }
+.lr-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.panel-intro .field select { height: 34px; }

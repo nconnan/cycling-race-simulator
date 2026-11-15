@@ -14,6 +14,21 @@ Plan graded cycling races: predict when grades catch each other, plan start gaps
 - **Smooth playback**: markers are redrawn in step with the screen's refresh rate and leave a short fading trail. At 1×, playback slows down for short courses so the fastest grade takes about 8 seconds per lap (15 seconds per course for other race types). Long courses keep the old maximum rate. Speeds are ½×, 1×, 2×, 4× and 8×, and a line under the speed buttons shows how long the whole race takes to play.
 - **"On course" strip**: one fixed-height row that scrolls sideways, so the track no longer jumps when many grades are racing.
 
+## New in v11.7: automatic club results from Sporthive
+
+- **Weekly update:** every Monday at about 5:15 am Perth time, GitHub runs `tools/sporthive-sync.js`.
+  - It reads each listed club's new races from Sporthive (MYLAPS) and adds their grade speeds to `js/history-data.js` (speeds only, no names).
+  - It runs the tests, saves the data and republishes the app.
+  - A week with nothing new makes about 6 requests to Sporthive. Races published twice (same day, course and results) are kept once.
+  - If Sporthive can't be read, the run fails, GitHub emails the repository owner, and the app keeps the last data.
+- **Update now:** in the repository's **Actions** tab, choose **Test and deploy**, then **Run workflow**.
+- **Clubs:** choose the club in **Race setup → Club** or in the History tab. Course lists, suggested speeds, the wizard and the latest races all follow the chosen club. The list starts with Peel District Cycling Club and Midland Cycle Club.
+- **Add a club:** choose **Club → Add your club…**, paste the club's Sporthive page address (`sporthive.com/organizations/<number>`) and its name, and copy the line the app makes into `tools/sporthive.config.json` on GitHub. The club's results arrive at the next update. The app itself can't read Sporthive (MYLAPS blocks other websites), so the list lives in the repository.
+- **Latest club races** (History tab): each recent graded race has **Use these speeds** and **Review against plan**, with no CSV download needed.
+- Run the sync yourself with `npm run sync`. Behind a proxy, use Node 22.21+ with `NODE_USE_ENV_PROXY=1`.
+
+This uses MYLAPS' public results service, the one their own website uses. It isn't an official interface for other apps and could change. The CSV import (Grades → Import results) remains as a fallback.
+
 ## New in v11.6: professional UI pass
 
 - **Race timeline** (Live track → *Timeline*): one bar per grade from start to finish, with lap ticks, the bell lap (▲), catches (a red line from catcher to caught; dashed when lapping), the finish-by deadline and the playhead. **Drag a bar** to change that grade's start and watch the catches move, or focus a bar and use ← → (Shift for 5 minutes). The timeline is also printed on the race sheet.
@@ -116,6 +131,7 @@ docs/                    sample GPX course, sample results CSV, example race she
 tests/fixtures/          real MyLaps/Sporthive exports (riders anonymised) used by the tests
 tests/ui.smoke.js        browser test of the whole app (Playwright)
 build.js                 makes the single-file version in dist/
+tools/sporthive-sync.js  weekly Sporthive results update (clubs in tools/sporthive.config.json)
 ```
 
 ## Commands

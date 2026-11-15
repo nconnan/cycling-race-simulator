@@ -309,6 +309,20 @@ async function exercise(page, label) {
   check(await page.evaluate(() => document.querySelectorAll('#print-sheet .sheet-timeline svg rect').length >= 5), 'race sheet includes the timeline');
   await page.evaluate(() => resetAllSetup());
 
+  // ---- Clubs and latest club races (weekly Sporthive sync) ----
+  const clubs = await page.evaluate(() => clubList().map(c => c.name));
+  check(clubs.includes('Peel District Cycling Club') && clubs.includes('Midland Cycle Club'), `clubs to choose from (${clubs.join(', ')})`);
+  await page.evaluate(() => { const m = clubList().find(c => c.name === 'Midland Cycle Club'); setClub(String(m.id)); showTab('history'); });
+  const mid = await page.evaluate(() => [historyCourses().map(([c]) => c).join(','), document.querySelectorAll('#history-content .latest-race').length]);
+  check(/Pickering Brook/.test(mid[0]) && !/Smeaton/.test(mid[0]) && mid[1] >= 2, `history follows the club (${mid[0]}; ${mid[1]} latest races)`);
+  await page.evaluate(() => { const r = allHistory().find(x => x.c === 'Pickering Brook' && !x.mine); reviewHistoryRace(r.id); });
+  check(await page.evaluate(() => reviewState && document.querySelectorAll('#review-content tbody tr').length >= 4 && document.querySelector('.tab.active').dataset.tab === 'review'), 'review a club race against the plan without a CSV');
+  await page.evaluate(() => { const r = allHistory().find(x => x.c === 'Pickering Brook' && !x.mine); useHistoryRace(r.id); });
+  check(await page.evaluate(() => grades[0].spd === 42.4 && historyCourse === 'Pickering Brook'), 'use a club race\'s speeds');
+  await page.evaluate(() => { setClub('add'); document.getElementById('club-ref').value = 'https://sporthive.com/organizations/123456'; document.getElementById('club-name').value = 'Test CC'; updateClubLine(); });
+  check(await page.evaluate(() => document.getElementById('club-line').value === '{ "id": 123456, "name": "Test CC" },'), 'add-your-club makes the config line');
+  await page.evaluate(() => { closeDialog(); const p = clubList().find(c => c.name.startsWith('Peel')); setClub(String(p.id)); resetAllSetup(); });
+
   // Playback: animation frames, smooth and course-aware
   await page.evaluate(() => { resetRace(); setSpeed(1); playRace(); });
   await page.waitForTimeout(1500);

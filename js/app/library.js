@@ -43,6 +43,7 @@ function buildRaceData(opts = {}) {
     scenarioAdjustments,
     review: reviewState,
     historyCourse,
+    club: currentClub() ? currentClub().id : null,
     version: APP_VERSION
   };
   if (!opts.lean) {
@@ -90,6 +91,7 @@ function applyRaceData(data) {
   hillEffect = data.hillEffect !== false;
   plannerLocks = new Set();
   reviewState = validReview(data.review) ? data.review : null;
+  if (data.club !== undefined && clubList().some(c => c.id === data.club)) selectedClub = data.club;
   historyCourse = typeof data.historyCourse === 'string' ? data.historyCourse : '';
 
   document.getElementById('race-name').value = raceName;

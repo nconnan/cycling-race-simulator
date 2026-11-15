@@ -444,3 +444,32 @@ test('version and update date agree everywhere', () => {
   const html = read('index.html');
   assert.ok(html.includes(`v${version}</span>`) && html.includes(`Version ${version} · updated`), 'index.html first-paint text');
 });
+
+// ---------- Sporthive sync ----------
+const sync = require('../tools/sporthive-sync.js');
+
+test('sync: a Sporthive CSV becomes a history record with the same numbers as the importer', () => {
+  const ev = { id: 3722669, name: 'Pickering Brook 20-09-2026', startDate: '2026-09-20', location: { name: 'Pickering Brook', length: 0 } };
+  const rec = sync.raceRecord(fixture('pickering-brook'), ev, 12873011, 884864);
+  assert.equal(rec.id, '12873011');
+  assert.equal(rec.o, 884864);
+  assert.equal(rec.l, 7.6);
+  assert.equal(rec.c, 'Pickering Brook');
+  const ma = rec.g.find(g => g[0] === 'MA');
+  assert.deepEqual(ma.slice(0, 4), ['MA', 10, 23, 42.4]);
+  assert.equal(ma[5], 8, 'lapped/pulled riders counted');
+  assert.ok(!JSON.stringify(rec).includes('Rider'), 'no names');
+  // Single-lap road races are left out
+  const road = sync.raceRecord(fixture('road-champs'), { name: 'Road', startDate: '2026-11-01', location: { name: 'Boddington', length: 120 } }, 1, 1);
+  assert.equal(road, null);
+});
+
+test('sync: the committed history has session ids, clubs and no names', () => {
+  const h = sync.readHistory(path.join(__dirname, '../js/history-data.js'));
+  assert.ok(h.clubs.length >= 1 && h.clubs.every(c => c.id && c.name && c.races >= 0));
+  assert.ok(h.races.every(r => r.id && h.clubs.some(c => c.id === r.o)), 'every race belongs to a listed club');
+  assert.equal(new Set(h.races.map(r => r.id)).size, h.races.length, 'no duplicate races');
+  assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(h.fetched));
+  const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, '../tools/sporthive.config.json'), 'utf8'));
+  assert.deepEqual(h.clubs.map(c => c.id), cfg.organisations.map(o => o.id), 'clubs match the config');
+});

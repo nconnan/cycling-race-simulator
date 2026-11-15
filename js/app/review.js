@@ -181,15 +181,94 @@ function setReviewStart(k, value) {
 // ---------- Course speed history ----------
 
 const USER_HISTORY_KEY = 'crs-history-v1';
+let selectedClub = (() => { try { const v = localStorage.getItem('crs-club'); return v === null ? null : +v; } catch (e) { return null; } })();
+
+function renderClubSelect() {
+  const sel = document.getElementById('club-select');
+  if (!sel) return;
+  const clubs = clubList();
+  const cur = currentClub();
+  sel.innerHTML = clubs.map(c => `<option value="${c.id}" ${cur && c.id === cur.id ? 'selected' : ''}>${escapeHtml(c.name)} (${c.races} race${c.races === 1 ? '' : 's'})</option>`).join('')
+    + `<option value="add">Add your club…</option>`;
+  const h = window.BUILTIN_HISTORY;
+  document.getElementById('club-hint').textContent = h && h.fetched
+    ? `Results from Sporthive (MYLAPS), checked every Monday. New races last added ${new Date(h.fetched + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}.`
+    : '';
+}
+
+function setClub(value) {
+  if (value === 'add') { renderClubSelect(); openAddClub(); return; }
+  selectedClub = +value;
+  try { localStorage.setItem('crs-club', String(selectedClub)); } catch (e) {}
+  if (historyCourse && !historyCourses().some(([c]) => c === historyCourse)) historyCourse = '';
+  renderClubSelect();
+  renderHistoryCourseSelect();
+  renderHistory();
+  scheduleAutosave();
+}
+
+function openAddClub() {
+  const clubs = clubList();
+  openDialog('Add your club', `
+    <p style="margin:0 0 10px;color:var(--text-2)">Any club whose results are on <strong>Sporthive</strong> (MYLAPS) can be added. The app reads clubs' results once a week, so a new club's history appears after the next Monday update.</p>
+    <ol class="add-club-steps">
+      <li>On <strong>sporthive.com</strong>, open your club's page. Its address ends in the club's number, e.g. <span class="mono">sporthive.com/organizations/<strong>290954</strong></span>.</li>
+      <li>Paste that address (or the number) and the club's name here:</li>
+    </ol>
+    <div class="field-grid">
+      <label class="field"><span class="field-label">Sporthive club page or number</span><input type="text" id="club-ref" placeholder="sporthive.com/organizations/…" oninput="updateClubLine()"></label>
+      <label class="field"><span class="field-label">Club name</span><input type="text" id="club-name" placeholder="e.g. Midland Cycle Club" oninput="updateClubLine()"></label>
+    </div>
+    <ol class="add-club-steps" start="3">
+      <li>Add this line to the club list on GitHub (<a href="https://github.com/${APP_REPO}/edit/main/tools/sporthive.config.json" target="_blank" rel="noopener">tools/sporthive.config.json</a>), inside <span class="mono">"organisations"</span>, or send it to whoever looks after the app:</li>
+    </ol>
+    <input type="text" id="club-line" readonly onclick="this.select()" value="">
+    <p class="field-hint" style="margin:8px 0 0">Clubs already included: ${clubs.map(c => escapeHtml(c.name)).join(', ') || 'none'}. To update straight away instead of waiting for Monday, run the “Test and deploy” workflow from the repository's Actions tab.</p>
+  `, `
+    <span style="flex:1"></span>
+    <button class="btn" onclick="closeDialog()">Close</button>
+    <button class="btn primary" onclick="copyClubLine()">Copy line</button>
+  `);
+  updateClubLine();
+}
+
+function updateClubLine() {
+  const ref = (document.getElementById('club-ref').value.match(/(\d{3,})\s*\/?\s*$/) || [])[1] || '';
+  const name = document.getElementById('club-name').value.trim();
+  document.getElementById('club-line').value = `{ "id": ${ref || '<number>'}, "name": ${JSON.stringify(name || '<club name>')} },`;
+}
+
+async function copyClubLine() {
+  const input = document.getElementById('club-line');
+  try { await navigator.clipboard.writeText(input.value); } catch (e) { input.select(); }
+  showToast(`<span class="t-ico">✓</span><span>Line copied</span>`);
+}
 
 function userHistory() {
   const h = storageGet(USER_HISTORY_KEY, []);
   return Array.isArray(h) ? h.filter(r => r && r.c && Array.isArray(r.g)) : [];
 }
 
+// Clubs whose Sporthive results are built in (refreshed weekly by tools/sporthive-sync.js)
+function clubList() {
+  const h = window.BUILTIN_HISTORY;
+  if (!h) return [];
+  if (Array.isArray(h.clubs) && h.clubs.length) return h.clubs;
+  return [{ id: null, name: h.club || 'Club', races: (h.races || []).length }];
+}
+
+function currentClub() {
+  const clubs = clubList();
+  return clubs.find(c => c.id === selectedClub) || clubs[0] || null;
+}
+
+// Built-in races of the selected club, plus your own reviewed races for that club
 function allHistory() {
   const builtin = (window.BUILTIN_HISTORY && Array.isArray(window.BUILTIN_HISTORY.races)) ? window.BUILTIN_HISTORY.races : [];
-  return userHistory().map(r => ({ ...r, mine: true })).concat(builtin);
+  const club = currentClub();
+  const id = club ? club.id : null;
+  const mine = userHistory().filter(r => r.o === undefined || r.o === null || r.o === id).map(r => ({ ...r, mine: true }));
+  return mine.concat(builtin.filter(r => r.o === undefined || r.o === null || id === null || r.o === id));
 }
 
 function historyCourses() {
@@ -248,8 +327,10 @@ function renderHistory() {
     `<option value="${escapeHtml(c)}" ${c === historyCourse ? 'selected' : ''}>${escapeHtml(c)} (${n})</option>`).join('');
   const head = `
     <div class="panel-intro">
-      <p>Grade speeds from past races, by course${builtin ? `: built in from <strong>${escapeHtml(builtin.club)}</strong> results on Sporthive (${builtin.races.length} races)` : ''}${mine.length ? `, plus <strong>${mine.length}</strong> of your reviewed race${mine.length === 1 ? '' : 's'}` : ''}. Suggested speed is the median of the most recent races; the ± range covers both the spread within a race and how much a grade varies race to race.</p>
+      <p>Grade speeds from past races, by course${builtin && currentClub() ? `: <strong>${escapeHtml(currentClub().name)}</strong> results on Sporthive (${currentClub().races} races, new races last added ${escapeHtml(builtin.fetched || '')})` : ''}${mine.length ? `, plus <strong>${mine.length}</strong> of your reviewed race${mine.length === 1 ? '' : 's'}` : ''}. Suggested speed is the median of the most recent races; the ± range covers both the spread within a race and how much a grade varies race to race.</p>
+      <label class="field" style="min-width:220px"><span class="field-label">Club</span><select onchange="setClub(this.value)">${clubList().map(c => `<option value="${c.id}" ${currentClub() && c.id === currentClub().id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}<option value="add">Add your club…</option></select></label>
     </div>
+    ${latestRacesHTML()}
     <div class="history-bar">
       <label class="field"><span class="field-label">Course</span><select onchange="setHistoryCourse(this.value); renderHistoryCourseSelect()">${courseOptions}</select></label>
       <label class="field"><span class="field-label">Use the latest</span><select onchange="setHistoryRecent(this.value)">${[3, 6, 10, 20].map(n => `<option value="${n}" ${n === historyRecent ? 'selected' : ''}>${n} races</option>`).join('')}</select></label>
@@ -414,6 +495,7 @@ function addReviewToHistory() {
   if (!c) { alert('Enter a course name.'); return; }
   const entry = {
     id: `h${Date.now().toString(36)}`,
+    o: currentClub() ? currentClub().id : null,
     d, c, e: raceName, l,
     g: reviewState.groups.filter(g => g.speed > 0).map(g => [g.label, g.fullLaps || null, g.n, g.speed, g.range, g.shortCount || 0])
   };
@@ -426,4 +508,76 @@ function addReviewToHistory() {
   renderReview();
   scheduleAutosave();
   showToast(`<span class="t-ico">✓</span><span>Added to the <strong>${escapeHtml(c)}</strong> history</span>`);
+}
+
+// ---------- Latest club races (from the weekly Sporthive update) ----------
+
+function latestRacesHTML() {
+  // Graded club races only (three or more of A–E, Open, WA–WD), newest first
+  const clubKeys = ['A', 'B', 'C', 'D', 'E', 'OPEN', 'WA', 'WB', 'WC', 'WD'];
+  const graded = r => r.g.filter(g => clubKeys.includes(SimCore.gradeKey(g[0]))).length >= 3;
+  const all = allHistory().filter(r => !r.mine);
+  const races = (all.some(graded) ? all.filter(graded) : all).slice(0, 6);
+  if (!races.length) return '';
+  const row = r => {
+    const main = r.g.filter(g => ['A', 'B', 'C', 'D', 'E', 'OPEN'].includes(SimCore.gradeKey(g[0]))).slice(0, 5);
+    return `<div class="latest-race">
+      <div class="lr-main">
+        <div class="lr-name">${escapeHtml(r.e)}</div>
+        <div class="lr-meta"><span class="mono">${escapeHtml(r.d)}</span> · ${escapeHtml(r.c)} · ${r.l} km lap · ${r.g.length} grade${r.g.length === 1 ? '' : 's'}${main.length ? ` · ${main.map(g => `${escapeHtml(SimCore.gradeKey(g[0]))} ${g[3]}`).join(', ')} km/h` : ''}</div>
+      </div>
+      <div class="lr-actions">
+        <button class="btn sm" onclick="useHistoryRace('${r.id}')" title="Set your grades' speeds and ranges from this race">Use these speeds</button>
+        <button class="btn sm" onclick="reviewHistoryRace('${r.id}')" title="Compare this race with your current plan">Review against plan</button>
+      </div>
+    </div>`;
+  };
+  return `<div class="scenario-result-head" style="margin:4px 0 6px">Latest club races</div><div class="latest-races">${races.map(row).join('')}</div>`;
+}
+
+function historyRace(id) {
+  return allHistory().find(r => String(r.id) === String(id));
+}
+
+function useHistoryRace(id) {
+  const r = historyRace(id);
+  if (!r) return;
+  const rows = document.getElementById('grade-form').querySelectorAll('.grade-row');
+  let n = 0;
+  grades.forEach((g, i) => {
+    const hit = r.g.find(x => SimCore.gradeKey(x[0]) === SimCore.gradeKey(g.name));
+    if (!hit || !rows[i]) return;
+    const idx = rows[i].dataset.index;
+    document.getElementById(`g${idx}_spd`).value = hit[3];
+    document.getElementById(`g${idx}_range`).value = hit[4];
+    n++;
+  });
+  historyCourse = r.c;
+  updateCourseSetup();
+  showUndoToast(`<span class="t-ico">✓</span><span>Speeds for <strong>${n}</strong> grade${n === 1 ? '' : 's'} from ${escapeHtml(r.e)}</span>`);
+}
+
+function reviewHistoryRace(id) {
+  const r = historyRace(id);
+  if (!r) return;
+  const used = new Set();
+  reviewState = {
+    fileName: `${r.e} (${r.d}, Sporthive)`,
+    lapKm: r.l,
+    importedAt: Date.now(),
+    addedToHistory: true,
+    groups: r.g.map(([label, laps, n, speed, range, lapped]) => {
+      const g = grades.find(x => SimCore.gradeKey(x.name) === SimCore.gradeKey(label) && !used.has(x.idx));
+      if (g) used.add(g.idx);
+      return {
+        label, gradeName: g ? g.name : null, gradeIdx: g ? g.idx : -1,
+        fullLaps: laps, shortCount: lapped || 0, n, median: speed, speed, range,
+        winnerMinutes: null,
+        medianMinutes: laps && speed ? laps * r.l / speed * 60 : null
+      };
+    })
+  };
+  showTab('review');
+  renderReview();
+  scheduleAutosave();
 }
