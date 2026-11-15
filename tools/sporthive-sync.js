@@ -61,16 +61,18 @@ function writeHistory(file, h) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// Retries busy or failed requests patiently: 3, 8, 20, 45 s (MYLAPS sometimes answers 503 under load).
 async function get(url, kind = 'json') {
   let last;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const waits = [3000, 8000, 20000, 45000];
+  for (let attempt = 0; attempt <= waits.length; attempt++) {
     try {
       const res = await fetch(url, { headers: { ...HEADERS, Accept: kind === 'json' ? 'application/json' : 'text/csv' } });
       if (res.ok) return kind === 'json' ? res.json() : res.text();
       last = new Error(`${res.status} ${res.statusText} for ${url}`);
-      if (res.status === 404) break;
+      if (res.status === 404 || res.status === 403) break;
     } catch (e) { last = e; }
-    await sleep(1000 * (attempt + 1) * 2);
+    if (attempt < waits.length) await sleep(waits[attempt]);
   }
   throw last;
 }
@@ -113,6 +115,7 @@ async function main() {
   for (const org of cfg.organisations) {
     const events = [];
     for (let offset = 0; ; offset += 100) {
+      if (offset) await sleep(1500);
       const page = await get(`${API}/organizations/${org.id}/events?count=100&offset=${offset}`);
       requests++;
       events.push(...page);
