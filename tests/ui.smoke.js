@@ -273,7 +273,7 @@ async function exercise(page, label) {
   await page.keyboard.press('ArrowRight');
   check(await page.evaluate(() => grades[1].start === fromClock('09:03')), 'arrow key moves a start by a minute');
   await page.evaluate(() => document.querySelector('#timeline-plot .tl-bar[data-idx="2"]').scrollIntoView({ block: 'center' }));
-  const box = await page.locator('#timeline-plot .tl-bar[data-idx="2"] rect').boundingBox();
+  const box = await page.locator('#timeline-plot .tl-bar[data-idx="2"] rect.tl-body').boundingBox();
   const ppm = await page.evaluate(() => { const l = document.getElementById('tl-playhead'); const svg = document.querySelector('#timeline-plot svg'); return (+l.dataset.plotw / (+l.dataset.hi - +l.dataset.lo)) * svg.getBoundingClientRect().width / svg.viewBox.baseVal.width; });
   await page.mouse.move(box.x + 10, box.y + box.height / 2);
   await page.mouse.down();

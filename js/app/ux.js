@@ -180,7 +180,7 @@ function buildTimelineSVG(width, opts = {}) {
     s += `<text x="${left - 10}" y="${y + 4}" text-anchor="end" font-size="12" font-weight="700" fill="${C.text}">${esc(g.name)}</text>`;
     const tip = `${g.name}: start ${toClock(g.start)}, ${tr.neutralisedAt !== null ? 'neutralised ' + toClock(tr.neutralisedAt) : 'finish ' + toClock(end)}${raceType === 'circuit' ? `, ${g.laps} laps` : ''} at ${fmtSpd(g.spd)} km/h`;
     s += `<g class="tl-bar${dragging ? ' dragging' : ''}" data-idx="${i}" ${P ? '' : `tabindex="0" role="slider" aria-label="${esc(g.name)} start time" aria-valuetext="${toClock(g.start)}" data-tip="${esc(tip)}"`}>`;
-    s += `<rect x="${x0}" y="${y - barH / 2}" width="${Math.max(2, x1 - x0)}" height="${barH}" rx="${barH / 2}" fill="${fill}" stroke="${C.bar}" stroke-opacity=".55" stroke-width="1.2"/>`;
+    s += `<rect class="tl-body" x="${x0}" y="${y - barH / 2}" width="${Math.max(2, x1 - x0)}" height="${barH}" rx="${barH / 2}" fill="${fill}" stroke="${C.bar}" stroke-opacity=".55" stroke-width="1.2"/>`;
     if (raceType === 'circuit' && g.laps > 1) {
       for (let k = 1; k < g.laps; k++) {
         const t = SimCore.timeAtDistance(tr, k * lapLength);
