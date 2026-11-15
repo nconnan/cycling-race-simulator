@@ -1,6 +1,6 @@
 {
   "name": "cycling-race-simulator",
-  "version": "11.7.0",
+  "version": "11.7.1",
   "description": "Plan graded cycling races: predict catches, plan start gaps and print a race-day sheet.",
   "private": true,
   "scripts": {

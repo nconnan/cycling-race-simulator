@@ -31,7 +31,7 @@ This uses MYLAPS' public results service, the one their own website uses. It isn
 
 ## New in v11.6: professional UI pass
 
-- **Race timeline** (Live track → *Timeline*): one bar per grade from start to finish, with lap ticks, the bell lap (▲), catches (a red line from catcher to caught; dashed when lapping), the finish-by deadline and the playhead. **Drag a bar** to change that grade's start and watch the catches move, or focus a bar and use ← → (Shift for 5 minutes). The timeline is also printed on the race sheet.
+- **Race timeline** (Live track → *Timeline*): one bar per grade from start to finish, with lap ticks, a bell icon at the start of each grade's final lap, catches (a red line from catcher to caught; dashed when lapping), the finish-by deadline and the playhead. **Drag a bar** to change that grade's start and watch the catches move, or focus a bar and use ← → (Shift for 5 minutes). The timeline is also printed on the race sheet.
 - **Grouped tabs:** **Race** (Standings, Catch log, Summary), **Plan** (Start planner, Catch risk, What-if) and **Learn** (Review, History). On phones the three groups are a bottom bar. Arrow keys move between tabs.
 - **Undo / Redo** (above Race setup, or Ctrl/⌘ Z and Ctrl/⌘ Shift Z) for every setup change. Bigger actions (applying a plan, speeds from history or results, a pasted table, the wizard, reset) show a confirmation with an **Undo** button.
 - **Calmer editing:** changing the setup keeps the playback position instead of jumping back to the start.

@@ -3,7 +3,7 @@
  * The race maths lives in js/core.js (SimCore) and is covered by tests/core.test.js.
  */
 // Release version and date. Keep in step with package.json and sw.js (a test checks).
-const APP_VERSION = '11.7.0';
+const APP_VERSION = '11.7.1';
 const APP_UPDATED = '2026-11-15';
 // Where the app's code and club list live (for "Add your club").
 const APP_REPO = 'nconnan/cycling-race-simulator';

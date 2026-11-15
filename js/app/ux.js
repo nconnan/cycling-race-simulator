@@ -189,7 +189,12 @@ function buildTimelineSVG(width, opts = {}) {
       }
       const bell = SimCore.timeAtDistance(tr, (g.laps - 1) * lapLength);
       if (bell !== null && tr.neutralisedAt === null) {
-        s += `<path d="M${X(bell) - 4},${y - barH / 2 - 3} l4,-6 l4,6 z" fill="${C.bell}"${P ? '' : ` data-tip="${esc(g.name)}: bell (final lap) ${toClockSec(bell)}"`}/>`;
+        // A small bell icon (vector, so it looks the same everywhere and in print), sitting on the bar
+        const bx = X(bell) - 5, by = y - barH / 2 - 12;
+        s += `<g transform="translate(${bx},${by})" fill="${C.bell}"${P ? '' : ` data-tip="${esc(g.name)}: bell (final lap) ${toClockSec(bell)}"`}>`
+          + `<path d="M5 0.6C3.1 0.6 2 2.2 2 4.2V6.6L0.7 8.3H9.3L8 6.6V4.2C8 2.2 6.9 0.6 5 0.6Z"/>`
+          + `<circle cx="5" cy="9.7" r="1.25"/>`
+          + `<rect x="0" y="0" width="10" height="11" fill="transparent"/></g>`;
       }
     }
     if (tr.neutralisedAt !== null) {
