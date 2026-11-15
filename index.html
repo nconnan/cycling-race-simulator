@@ -185,6 +185,7 @@
         <button class="tab" data-tab="planner" onclick="showTab('planner')" role="tab">Start planner</button>
         <button class="tab" data-tab="whatif" onclick="showTab('whatif')" role="tab">What-if</button>
         <button class="tab" data-tab="summary" onclick="showTab('summary')" role="tab">Race summary <span class="ready-dot" id="summary-ready"></span></button>
+        <button class="tab" data-tab="review" onclick="showTab('review')" role="tab">Review <span class="ready-dot" id="review-ready"></span></button>
       </div>
 
       <div class="tab-panel active" id="tab-standings">
@@ -279,6 +280,10 @@
           </div>
           <div class="scenario-grid" id="scenario-grid"></div>
         </div>
+      </div>
+
+      <div class="tab-panel" id="tab-review">
+        <div id="review-content"></div>
       </div>
 
       <div class="tab-panel" id="tab-summary">

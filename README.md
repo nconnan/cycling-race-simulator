@@ -14,6 +14,25 @@ Plan graded cycling races: predict when grades catch each other, plan start gaps
 - **Smooth playback**: markers are redrawn in step with the screen's refresh rate and leave a short fading trail. At 1×, playback slows down for short courses so the fastest grade takes about 8 seconds per lap (15 seconds per course for other race types). Long courses keep the old maximum rate. Speeds are ½×, 1×, 2×, 4× and 8×, and a line under the speed buttons shows how long the whole race takes to play.
 - **"On course" strip**: one fixed-height row that scrolls sideways, so the track no longer jumps when many grades are racing.
 
+## New in v11.4: post-race review
+
+1. After the race, open the event on **Sporthive / Speedhive** and download the results CSV. MyLaps Orbits exports work too, as does any results file with a grade and a time column.
+2. Under the grades, choose **Import results (CSV)**. The importer is built around real MyLaps Orbits Cycling exports:
+   - It uses **Total Time**, not *Best Speed*, which is a best lap.
+   - It skips DNF, DNS and DQ riders.
+   - It leaves lapped or pulled riders (fewer laps than their grade) out of the speeds.
+   - It works out the **lap length** from best lap × best speed and offers to use it.
+   - It matches club grades like **MA, MB, MC** to grades **A, B, C**.
+3. **Compare with plan** opens the **Review** tab, with plan against actual for each grade:
+   - laps ridden
+   - planned and actual speed, and whether the actual fell in your ± range
+   - predicted and actual finish time
+   - the catches predicted with your planned speeds versus with the real speeds
+
+   **Update speeds from results** then feeds the real speeds and ranges into the next plan.
+
+The review is saved with the race as speeds and times only, with no riders' names. Sporthive's CSV has finishing times but no lap-by-lap times, so actual catches can't be confirmed from it. *Actual finish* assumes each grade started at its planned time.
+
 ## New in v11.3
 
 - **Races library** (header → *Races*): save races in this browser, then open, duplicate or delete them. The race you're working on is saved automatically and comes back when you reopen the app. Opening and downloading files has moved here too.
@@ -54,6 +73,7 @@ fonts/                   Inter and JetBrains Mono (SIL Open Font License)
 icons/                   app icons
 tests/core.test.js       engine tests (node:test)
 docs/                    sample GPX course, sample results CSV, example race sheet
+tests/fixtures/          real MyLaps/Sporthive exports (riders anonymised) used by the tests
 tests/ui.smoke.js        browser test of the whole app (Playwright)
 build.js                 makes the single-file version in dist/
 ```

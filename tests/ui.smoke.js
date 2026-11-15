@@ -104,7 +104,7 @@ async function exercise(page, label) {
   const file = path.join(os.tmpdir(), `race-${Date.now()}.json`);
   await dl.saveAs(file);
   const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
-  check(saved.version === '11.3' && saved.afterCatch === 'merge' && saved.grades[1].range === 2.5, 'saved file has version, rule and ranges');
+  check(saved.version === '11.4' && saved.afterCatch === 'merge' && saved.grades[1].range === 2.5, 'saved file has version, rule and ranges');
   await page.evaluate(() => { document.getElementById('after-catch').value = 'continue'; handleAfterCatchChange(); });
   await page.setInputFiles('#loadFileInput', file);
   await page.waitForTimeout(300);
@@ -208,6 +208,25 @@ async function exercise(page, label) {
   await page.waitForTimeout(300);
   check(await page.evaluate(() => course && course.name === 'Sample park circuit'), 'course map saved and loaded');
   await page.evaluate(() => { clearCourse(); resetAllSetup(); });
+
+  // ---- Post-race review with a real MyLaps (Sporthive) export ----
+  await page.evaluate(() => { resetAllSetup(); });
+  await page.setInputFiles('#resultsFileInput', path.join(root, 'tests', 'fixtures', 'sporthive-pickering-brook.csv'));
+  await page.waitForFunction(() => document.getElementById('dialog').classList.contains('active'));
+  const imp = await page.evaluate(() => ({ lapKm: importState.res.lapKm, map: importState.res.groups.map((g, k) => `${g.label}:${importState.map[k]}`).join(' ') }));
+  check(imp.lapKm === 7.6, `lap length read from the Sporthive file (${imp.lapKm} km)`);
+  check(/MA:0 MB:1/.test(imp.map) && /MC:2/.test(imp.map) && /MD:3/.test(imp.map), `MA–MD matched to grades A–D (${imp.map})`);
+  await page.evaluate(() => useImportLap());
+  check(await page.evaluate(() => lapLength === 7.6), 'race lap set from the file');
+  await page.evaluate(() => compareWithPlan());
+  const rv = await page.evaluate(() => ({ rows: document.querySelectorAll('#review-content tbody tr').length, text: document.getElementById('review-content').textContent }));
+  check(rv.rows === 4, `review compares 4 grades (${rv.rows})`);
+  check(/42\.4/.test(rv.text) && /40\.5/.test(rv.text), 'review shows the actual A and B speeds');
+  const saved4 = await page.evaluate(() => JSON.stringify(buildRaceData({ lean: true })));
+  check(/"review"/.test(saved4) && !/Rider \d/.test(saved4), 'review saved with the race, without riders\' names');
+  await page.evaluate(() => applyReviewSpeeds());
+  check(await page.evaluate(() => grades[0].spd === 42.4 && grades[1].spd === 40.5), 'speeds updated from the review');
+  await page.evaluate(() => resetAllSetup());
 
   // Playback: animation frames, smooth and course-aware
   await page.evaluate(() => { resetRace(); setSpeed(1); playRace(); });

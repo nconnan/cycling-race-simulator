@@ -627,3 +627,9 @@ select {
 .lock-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 3px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); cursor: pointer; font-size: 12px; color: var(--text-2); }
 .lock-chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
 .lock-chip .lock-ico { font-size: 11px; opacity: .8; }
+
+/* Post-race review */
+.rv-catches { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.rv-catches > div { border: 1px solid var(--border); border-radius: 11px; padding: 10px 14px 12px; background: var(--surface-2); font-size: 13px; }
+.rv-catch { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 3px 0; }
+@media (max-width: 760px) { .rv-catches { grid-template-columns: 1fr; } }

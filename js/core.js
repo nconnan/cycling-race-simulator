@@ -553,43 +553,80 @@
   }
 
   /*
-   * Read a results CSV. Returns { columns, groups: [{ label, riders: [{ minutes, speed, distance, laps }] }], skipped }.
-   * Recognised headers (case-insensitive): grade/category/class, time/elapsed/duration,
-   * speed (km/h), distance (km), laps, status (DNF/DNS/DSQ rows are skipped).
+   * Read a results CSV, including MyLaps Orbits / Sporthive / Speedhive exports
+   * (Pos, Start Number, Competitor, Class, Total Time, Diff, Laps, Best Lap, Best Lap No., Best Speed).
+   *
+   * Returns {
+   *   columns, headers, skipped,
+   *   lapKm,                       lap length worked out from best lap × best speed, or null
+   *   groups: [{ label, fullLaps, shortCount, riders: [{ minutes, speed, distance, laps, short }] }]
+   * }
+   * DNF/DNS/DQ rows and rows without a time are skipped. Riders who finished fewer laps than
+   * most of their group (lapped or pulled) are kept but marked `short`.
    */
   function readResults(text) {
     const rows = parseCsv(text);
     if (rows.length < 2) throw new Error('The file has no result rows.');
-    const headers = rows[0].map(h => h.toLowerCase());
+    const headers = rows[0].map(h => h.toLowerCase().trim());
+    const notRaceTime = /start|gap|behind|\blap|pace|best|diff|of day|clock/;
     const col = {
-      grade: findColumn(headers, [/^grade$/, /grade/, /^cat(egory)?\b/, /categor/, /class/, /division/, /race/]),
-      time: findColumn(headers, [/elapsed/, /race ?time/, /duration/, /^time$/, /time/, /result/], /start|gap|behind|lap ?time|pace/),
-      speed: findColumn(headers, [/speed/, /km\/h/, /kph/, /avg/]),
+      grade: findColumn(headers, [/^grade$/, /grade/, /^class$/, /^cat(egory)?\b/, /categor/, /class/, /division/, /^race$/]),
+      time: findColumn(headers, [/total ?time/, /elapsed/, /race ?time/, /finish ?time/, /duration/, /^time$/, /time/, /result/], notRaceTime),
+      speed: findColumn(headers, [/av(era)?g\.? ?speed|speed ?av(era)?g/, /^speed$/, /speed/, /km\/h/, /kph/], /best|max|top|fastest/),
       distance: findColumn(headers, [/dist/, /^km$/, /\bkm\b/], /km\/h|speed/),
-      laps: findColumn(headers, [/^laps?$/, /laps/]),
-      status: findColumn(headers, [/status/, /dnf/, /^pos/, /^place/, /^rank/])
+      laps: findColumn(headers, [/^laps?$/, /laps/], /best|no\.?$|number|behind/),
+      status: findColumn(headers, [/status/, /dnf/]),
+      bestLap: findColumn(headers, [/^best ?lap$/, /best ?lap ?time/, /fastest ?lap$/], /no\.?$|number|#/),
+      bestSpeed: findColumn(headers, [/best ?speed/, /top ?speed/, /max ?speed/])
     };
     if (col.grade < 0) throw new Error('No grade or category column found.');
     if (col.time < 0 && col.speed < 0) throw new Error('No time or speed column found.');
     const unit = col.time >= 0 ? (/sec/.test(headers[col.time]) ? 'seconds' : /hour|\(h\)/.test(headers[col.time]) ? 'hours' : 'minutes') : null;
+    const num = v => parseFloat(String(v ?? '').replace(',', '.'));
 
     const groups = new Map();
+    const lapKms = [];
     let skipped = 0;
     for (const r of rows.slice(1)) {
       const label = (r[col.grade] || '').trim();
       const status = col.status >= 0 ? String(r[col.status] || '') : '';
-      if (!label || /\b(dnf|dns|dsq|dq|otl|abd)\b/i.test(status)) { skipped++; continue; }
+      if (!label || /\b(dnf|dns|dsq|dq|otl|abd|dnc)\b/i.test(status)) { skipped++; continue; }
       const rider = {
         minutes: col.time >= 0 ? parseDuration(r[col.time], unit) : NaN,
-        speed: col.speed >= 0 ? parseFloat(String(r[col.speed]).replace(',', '.')) : NaN,
-        distance: col.distance >= 0 ? parseFloat(String(r[col.distance]).replace(',', '.')) : NaN,
-        laps: col.laps >= 0 ? parseFloat(r[col.laps]) : NaN
+        speed: col.speed >= 0 ? num(r[col.speed]) : NaN,
+        distance: col.distance >= 0 ? num(r[col.distance]) : NaN,
+        laps: col.laps >= 0 ? num(r[col.laps]) : NaN,
+        short: false
       };
       if (!(rider.minutes > 0) && !(rider.speed > 0)) { skipped++; continue; }
+      if (col.bestLap >= 0 && col.bestSpeed >= 0) {
+        const t = parseDuration(r[col.bestLap], 'minutes'), v = num(r[col.bestSpeed]);
+        if (t > 0 && v > 0) lapKms.push(v * t / 60);
+      }
       if (!groups.has(label)) groups.set(label, []);
       groups.get(label).push(rider);
     }
-    return { columns: col, headers: rows[0], groups: [...groups].map(([label, riders]) => ({ label, riders })), skipped };
+
+    // Lap length: timing systems compute best speed from the configured lap length,
+    // so every rider gives (almost) the same figure. Only trust it when they agree.
+    let lapKm = null;
+    if (lapKms.length >= 3) {
+      lapKms.sort((a, b) => a - b);
+      const med = quantile(lapKms, 0.5), lo = quantile(lapKms, 0.1), hi = quantile(lapKms, 0.9);
+      if (med > 0.2 && med < 100 && (hi - lo) / med < 0.02) lapKm = Math.round(med * 100) / 100;
+    }
+
+    const out = [...groups].map(([label, riders]) => {
+      // Full distance = the most common lap count (the larger one on a tie)
+      const counts = new Map();
+      riders.forEach(r => { if (r.laps > 0) counts.set(r.laps, (counts.get(r.laps) || 0) + 1); });
+      let fullLaps = null, best = 0;
+      counts.forEach((c, l) => { if (c > best || (c === best && l > fullLaps)) { best = c; fullLaps = l; } });
+      let shortCount = 0;
+      if (fullLaps) riders.forEach(r => { if (r.laps > 0 && r.laps < fullLaps) { r.short = true; shortCount++; } });
+      return { label, fullLaps, shortCount, riders };
+    });
+    return { columns: col, headers: rows[0], groups: out, skipped, lapKm };
   }
 
   function quantile(sorted, q) {
@@ -599,21 +636,27 @@
   }
 
   /*
-   * Speed statistics for one group of riders. `distanceKm` is used when the file has
-   * no speed, distance or laps column; `lapLength` converts a laps column to km.
-   * Speeds outside 10–70 km/h are ignored as data errors.
+   * Speed statistics for one group of riders. Distance per rider comes from, in order:
+   * a distance column, laps × `lapLength`, or `distanceKm` (the grade's planned distance).
+   * Riders marked `short` (lapped or pulled) and speeds outside 10–70 km/h are ignored.
+   * Also returns the winner's and the median rider's elapsed time.
    */
   function speedStats(riders, distanceKm, lapLength) {
-    const speeds = [];
+    const speeds = [], times = [];
     for (const r of riders) {
+      if (r.short) continue;
       let v = r.speed;
       if (!(v > 0) && r.minutes > 0) {
         const d = r.distance > 0 ? r.distance : (r.laps > 0 && lapLength > 0 ? r.laps * lapLength : distanceKm);
         if (d > 0) v = d / (r.minutes / 60);
       }
-      if (v >= 10 && v <= 70) speeds.push(v);
+      if (v >= 10 && v <= 70) {
+        speeds.push(v);
+        if (r.minutes > 0) times.push(r.minutes);
+      }
     }
     speeds.sort((a, b) => a - b);
+    times.sort((a, b) => a - b);
     if (!speeds.length) return { n: 0 };
     const median = quantile(speeds, 0.5);
     const spread = (quantile(speeds, 0.9) - quantile(speeds, 0.1)) / 2;
@@ -623,7 +666,9 @@
       min: speeds[0],
       max: speeds[speeds.length - 1],
       speed: Math.round(median * 10) / 10,
-      range: speeds.length === 1 ? 1 : Math.max(0.5, Math.round(spread * 2) / 2)
+      range: speeds.length === 1 ? 1 : Math.max(0.5, Math.round(spread * 2) / 2),
+      winnerMinutes: times.length ? times[0] : null,
+      medianMinutes: times.length ? quantile(times, 0.5) : null
     };
   }
 

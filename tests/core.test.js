@@ -347,3 +347,43 @@ test('share links round-trip', async () => {
   assert.deepEqual(await C.decodeShare(z), data);
   assert.ok(/^[A-Za-z0-9_-]+$/.test(z.slice(1)), 'URL-safe');
 });
+
+// ---------- Real MyLaps (Orbits Cycling → Sporthive) exports, riders anonymised ----------
+const fixture = name => fs.readFileSync(path.join(__dirname, 'fixtures', `sporthive-${name}.csv`), 'utf8');
+
+test('Sporthive: columns, lap length, DNFs and lapped riders (Pickering Brook)', () => {
+  const res = C.readResults(fixture('pickering-brook'));
+  const h = i => res.headers[i];
+  assert.equal(h(res.columns.grade), 'Class');
+  assert.equal(h(res.columns.time), 'Total Time');
+  assert.equal(res.columns.speed, -1, 'Best Speed is a best lap, not the race speed');
+  assert.equal(h(res.columns.laps), 'Laps');
+  assert.equal(res.lapKm, 7.6, 'lap length from best lap × best speed');
+  assert.equal(res.skipped, 9, 'DNF/DNS rows (0.000) skipped');
+  const want = { MA: [10, 23, 8, 42.39, 107.12], MB: [8, 30, 3, 40.54, 89.72], MC: [6, 25, 8, 37.67, 72.56], MD: [6, 11, 3, 32.55, 82.13] };
+  for (const [label, [laps, n, short, median, winner]] of Object.entries(want)) {
+    const g = res.groups.find(x => x.label === label);
+    assert.equal(g.fullLaps, laps, `${label} laps`);
+    assert.equal(g.shortCount, short, `${label} lapped/pulled riders`);
+    const st = C.speedStats(g.riders, 0, res.lapKm);
+    assert.equal(st.n, n, `${label} riders counted`);
+    assert.ok(Math.abs(st.median - median) < 0.01, `${label} median ${st.median}`);
+    assert.ok(Math.abs(st.winnerMinutes - winner) < 0.01, `${label} winner ${st.winnerMinutes}`);
+  }
+});
+
+test('Sporthive: Midland Traders 100 (17.5 km lap) and a road race without lap speeds', () => {
+  const mid = C.readResults(fixture('midland-100'));
+  assert.equal(mid.lapKm, 17.5);
+  const mb = mid.groups.find(g => g.label === 'MB');
+  assert.equal(mb.fullLaps, 4);
+  assert.ok(Math.abs(C.speedStats(mb.riders, 0, mid.lapKm).median - 39.14) < 0.01);
+
+  const road = C.readResults(fixture('road-champs'));
+  assert.equal(road.lapKm, null, 'no best speeds, so no lap length');
+  assert.equal(road.groups.length, 21);
+  const elite = road.groups.find(g => g.label === 'MElite');
+  // Distance must come from the planned race (e.g. 120 km); 1 lap here means the whole course
+  const st = C.speedStats(elite.riders, 0, 120);
+  assert.ok(st.n === 19 && st.median > 30 && st.median < 45, `elite median ${st.median}`);
+});

@@ -644,6 +644,12 @@ select {
 .lock-chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
 .lock-chip .lock-ico { font-size: 11px; opacity: .8; }
 
+/* Post-race review */
+.rv-catches { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.rv-catches > div { border: 1px solid var(--border); border-radius: 11px; padding: 10px 14px 12px; background: var(--surface-2); font-size: 13px; }
+.rv-catch { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 3px 0; }
+@media (max-width: 760px) { .rv-catches { grid-template-columns: 1fr; } }
+
 </style>
 </head>
 <body>
@@ -815,6 +821,7 @@ select {
         <button class="tab" data-tab="planner" onclick="showTab('planner')" role="tab">Start planner</button>
         <button class="tab" data-tab="whatif" onclick="showTab('whatif')" role="tab">What-if</button>
         <button class="tab" data-tab="summary" onclick="showTab('summary')" role="tab">Race summary <span class="ready-dot" id="summary-ready"></span></button>
+        <button class="tab" data-tab="review" onclick="showTab('review')" role="tab">Review <span class="ready-dot" id="review-ready"></span></button>
       </div>
 
       <div class="tab-panel active" id="tab-standings">
@@ -909,6 +916,10 @@ select {
           </div>
           <div class="scenario-grid" id="scenario-grid"></div>
         </div>
+      </div>
+
+      <div class="tab-panel" id="tab-review">
+        <div id="review-content"></div>
       </div>
 
       <div class="tab-panel" id="tab-summary">
@@ -1532,43 +1543,80 @@ select {
   }
 
   /*
-   * Read a results CSV. Returns { columns, groups: [{ label, riders: [{ minutes, speed, distance, laps }] }], skipped }.
-   * Recognised headers (case-insensitive): grade/category/class, time/elapsed/duration,
-   * speed (km/h), distance (km), laps, status (DNF/DNS/DSQ rows are skipped).
+   * Read a results CSV, including MyLaps Orbits / Sporthive / Speedhive exports
+   * (Pos, Start Number, Competitor, Class, Total Time, Diff, Laps, Best Lap, Best Lap No., Best Speed).
+   *
+   * Returns {
+   *   columns, headers, skipped,
+   *   lapKm,                       lap length worked out from best lap × best speed, or null
+   *   groups: [{ label, fullLaps, shortCount, riders: [{ minutes, speed, distance, laps, short }] }]
+   * }
+   * DNF/DNS/DQ rows and rows without a time are skipped. Riders who finished fewer laps than
+   * most of their group (lapped or pulled) are kept but marked `short`.
    */
   function readResults(text) {
     const rows = parseCsv(text);
     if (rows.length < 2) throw new Error('The file has no result rows.');
-    const headers = rows[0].map(h => h.toLowerCase());
+    const headers = rows[0].map(h => h.toLowerCase().trim());
+    const notRaceTime = /start|gap|behind|\blap|pace|best|diff|of day|clock/;
     const col = {
-      grade: findColumn(headers, [/^grade$/, /grade/, /^cat(egory)?\b/, /categor/, /class/, /division/, /race/]),
-      time: findColumn(headers, [/elapsed/, /race ?time/, /duration/, /^time$/, /time/, /result/], /start|gap|behind|lap ?time|pace/),
-      speed: findColumn(headers, [/speed/, /km\/h/, /kph/, /avg/]),
+      grade: findColumn(headers, [/^grade$/, /grade/, /^class$/, /^cat(egory)?\b/, /categor/, /class/, /division/, /^race$/]),
+      time: findColumn(headers, [/total ?time/, /elapsed/, /race ?time/, /finish ?time/, /duration/, /^time$/, /time/, /result/], notRaceTime),
+      speed: findColumn(headers, [/av(era)?g\.? ?speed|speed ?av(era)?g/, /^speed$/, /speed/, /km\/h/, /kph/], /best|max|top|fastest/),
       distance: findColumn(headers, [/dist/, /^km$/, /\bkm\b/], /km\/h|speed/),
-      laps: findColumn(headers, [/^laps?$/, /laps/]),
-      status: findColumn(headers, [/status/, /dnf/, /^pos/, /^place/, /^rank/])
+      laps: findColumn(headers, [/^laps?$/, /laps/], /best|no\.?$|number|behind/),
+      status: findColumn(headers, [/status/, /dnf/]),
+      bestLap: findColumn(headers, [/^best ?lap$/, /best ?lap ?time/, /fastest ?lap$/], /no\.?$|number|#/),
+      bestSpeed: findColumn(headers, [/best ?speed/, /top ?speed/, /max ?speed/])
     };
     if (col.grade < 0) throw new Error('No grade or category column found.');
     if (col.time < 0 && col.speed < 0) throw new Error('No time or speed column found.');
     const unit = col.time >= 0 ? (/sec/.test(headers[col.time]) ? 'seconds' : /hour|\(h\)/.test(headers[col.time]) ? 'hours' : 'minutes') : null;
+    const num = v => parseFloat(String(v ?? '').replace(',', '.'));
 
     const groups = new Map();
+    const lapKms = [];
     let skipped = 0;
     for (const r of rows.slice(1)) {
       const label = (r[col.grade] || '').trim();
       const status = col.status >= 0 ? String(r[col.status] || '') : '';
-      if (!label || /\b(dnf|dns|dsq|dq|otl|abd)\b/i.test(status)) { skipped++; continue; }
+      if (!label || /\b(dnf|dns|dsq|dq|otl|abd|dnc)\b/i.test(status)) { skipped++; continue; }
       const rider = {
         minutes: col.time >= 0 ? parseDuration(r[col.time], unit) : NaN,
-        speed: col.speed >= 0 ? parseFloat(String(r[col.speed]).replace(',', '.')) : NaN,
-        distance: col.distance >= 0 ? parseFloat(String(r[col.distance]).replace(',', '.')) : NaN,
-        laps: col.laps >= 0 ? parseFloat(r[col.laps]) : NaN
+        speed: col.speed >= 0 ? num(r[col.speed]) : NaN,
+        distance: col.distance >= 0 ? num(r[col.distance]) : NaN,
+        laps: col.laps >= 0 ? num(r[col.laps]) : NaN,
+        short: false
       };
       if (!(rider.minutes > 0) && !(rider.speed > 0)) { skipped++; continue; }
+      if (col.bestLap >= 0 && col.bestSpeed >= 0) {
+        const t = parseDuration(r[col.bestLap], 'minutes'), v = num(r[col.bestSpeed]);
+        if (t > 0 && v > 0) lapKms.push(v * t / 60);
+      }
       if (!groups.has(label)) groups.set(label, []);
       groups.get(label).push(rider);
     }
-    return { columns: col, headers: rows[0], groups: [...groups].map(([label, riders]) => ({ label, riders })), skipped };
+
+    // Lap length: timing systems compute best speed from the configured lap length,
+    // so every rider gives (almost) the same figure. Only trust it when they agree.
+    let lapKm = null;
+    if (lapKms.length >= 3) {
+      lapKms.sort((a, b) => a - b);
+      const med = quantile(lapKms, 0.5), lo = quantile(lapKms, 0.1), hi = quantile(lapKms, 0.9);
+      if (med > 0.2 && med < 100 && (hi - lo) / med < 0.02) lapKm = Math.round(med * 100) / 100;
+    }
+
+    const out = [...groups].map(([label, riders]) => {
+      // Full distance = the most common lap count (the larger one on a tie)
+      const counts = new Map();
+      riders.forEach(r => { if (r.laps > 0) counts.set(r.laps, (counts.get(r.laps) || 0) + 1); });
+      let fullLaps = null, best = 0;
+      counts.forEach((c, l) => { if (c > best || (c === best && l > fullLaps)) { best = c; fullLaps = l; } });
+      let shortCount = 0;
+      if (fullLaps) riders.forEach(r => { if (r.laps > 0 && r.laps < fullLaps) { r.short = true; shortCount++; } });
+      return { label, fullLaps, shortCount, riders };
+    });
+    return { columns: col, headers: rows[0], groups: out, skipped, lapKm };
   }
 
   function quantile(sorted, q) {
@@ -1578,21 +1626,27 @@ select {
   }
 
   /*
-   * Speed statistics for one group of riders. `distanceKm` is used when the file has
-   * no speed, distance or laps column; `lapLength` converts a laps column to km.
-   * Speeds outside 10–70 km/h are ignored as data errors.
+   * Speed statistics for one group of riders. Distance per rider comes from, in order:
+   * a distance column, laps × `lapLength`, or `distanceKm` (the grade's planned distance).
+   * Riders marked `short` (lapped or pulled) and speeds outside 10–70 km/h are ignored.
+   * Also returns the winner's and the median rider's elapsed time.
    */
   function speedStats(riders, distanceKm, lapLength) {
-    const speeds = [];
+    const speeds = [], times = [];
     for (const r of riders) {
+      if (r.short) continue;
       let v = r.speed;
       if (!(v > 0) && r.minutes > 0) {
         const d = r.distance > 0 ? r.distance : (r.laps > 0 && lapLength > 0 ? r.laps * lapLength : distanceKm);
         if (d > 0) v = d / (r.minutes / 60);
       }
-      if (v >= 10 && v <= 70) speeds.push(v);
+      if (v >= 10 && v <= 70) {
+        speeds.push(v);
+        if (r.minutes > 0) times.push(r.minutes);
+      }
     }
     speeds.sort((a, b) => a - b);
+    times.sort((a, b) => a - b);
     if (!speeds.length) return { n: 0 };
     const median = quantile(speeds, 0.5);
     const spread = (quantile(speeds, 0.9) - quantile(speeds, 0.1)) / 2;
@@ -1602,7 +1656,9 @@ select {
       min: speeds[0],
       max: speeds[speeds.length - 1],
       speed: Math.round(median * 10) / 10,
-      range: speeds.length === 1 ? 1 : Math.max(0.5, Math.round(spread * 2) / 2)
+      range: speeds.length === 1 ? 1 : Math.max(0.5, Math.round(spread * 2) / 2),
+      winnerMinutes: times.length ? times[0] : null,
+      medianMinutes: times.length ? quantile(times, 0.5) : null
     };
   }
 
@@ -2186,6 +2242,7 @@ function resetAllSetup() {
     course = null;
     hillEffect = true;
     plannerLocks = new Set();
+    reviewState = null;
 
     gradeCounter = 5;
     setupGradeInputs();
@@ -2522,6 +2579,7 @@ function updateCourseSetup() {
   updatePlaybackHint();
   updateCourseUI();
   renderPlannerLocks();
+  renderReview();
   scheduleAutosave();
   updateHeaderMeta();
   resetRace();
@@ -4142,7 +4200,8 @@ function buildRaceData(opts = {}) {
     hillEffect,
     grades: gradeData,
     scenarioAdjustments,
-    version: '11.3'
+    review: reviewState,
+    version: '11.4'
   };
   if (!opts.lean) {
     // Snapshot images are regenerated on load, so they are not stored in the file.
@@ -4188,6 +4247,7 @@ function applyRaceData(data) {
   } : null;
   hillEffect = data.hillEffect !== false;
   plannerLocks = new Set();
+  reviewState = validReview(data.review) ? data.review : null;
 
   document.getElementById('race-name').value = raceName;
   document.getElementById('race-start-time').value = toClock(raceStartMinutes);
@@ -4406,6 +4466,8 @@ async function restoreStartupRace() {
 // ---------- Results import (calibrate speeds) ----------
 
 let importState = null;
+// Post-race review: per-grade summary of an imported results file (no riders' names).
+let reviewState = null;
 
 function importResults() {
   document.getElementById('resultsFileInput').click();
@@ -4424,10 +4486,15 @@ function handleResultsFile(event) {
     let res;
     try { res = SimCore.readResults(String(e.target.result)); }
     catch (err) { alert(`Could not read results: ${err.message}`); return; }
+    const used = new Set();
     const map = res.groups.map(gr => {
       const key = normaliseGradeLabel(gr.label);
-      const hit = grades.find(g => normaliseGradeLabel(g.name) === key) || grades.find(g => g.name.toLowerCase() === gr.label.toLowerCase());
-      return hit ? hit.idx : -1;
+      let hit = grades.find(g => normaliseGradeLabel(g.name) === key) || grades.find(g => g.name.toLowerCase() === gr.label.toLowerCase());
+      // Club exports often prefix men's grades with M (MA, MB, …); match those to A, B, …
+      if (!hit && /^m[a-z]$/.test(key)) hit = grades.find(g => normaliseGradeLabel(g.name) === key.slice(1));
+      if (!hit || used.has(hit.idx)) return -1;
+      used.add(hit.idx);
+      return hit.idx;
     });
     importState = { res, map, fileName: file.name };
     renderImportDialog();
@@ -4438,12 +4505,13 @@ function handleResultsFile(event) {
 function importStats(k) {
   const { res, map } = importState;
   const g = map[k] >= 0 ? grades[map[k]] : null;
-  return SimCore.speedStats(res.groups[k].riders, g ? g.totalDistance : 0, lapLength);
+  // A lap length found in the file wins over the race's setting
+  return SimCore.speedStats(res.groups[k].riders, g ? g.totalDistance : 0, res.lapKm || lapLength);
 }
 
 function renderImportDialog() {
   const { res, map, fileName } = importState;
-  const cols = Object.entries(res.columns).filter(([, i]) => i >= 0).map(([, i]) => res.headers[i]);
+  const cols = Object.entries(res.columns).filter(([k, i]) => i >= 0 && !['bestLap', 'bestSpeed'].includes(k)).map(([, i]) => res.headers[i]);
   const rows = res.groups.map((gr, k) => {
     const st = importStats(k);
     const g = map[k] >= 0 ? grades[map[k]] : null;
@@ -4451,27 +4519,37 @@ function renderImportDialog() {
       `<option value="${x.idx}" ${map[k] === x.idx ? 'selected' : ''}>${escapeHtml(x.name)}</option>`).join('');
     const speed = st.n ? `<strong class="mono">${st.speed}</strong> <span class="muted">±${st.range}</span>` : '<span class="muted">no usable times</span>';
     const now = g ? `<span class="mono muted">${fmtSpd(g.spd)} ±${g.range}</span>` : '';
+    const laps = gr.fullLaps ? `<span class="mono">${gr.fullLaps}</span>${gr.shortCount ? `<div class="muted" style="font-size:11.5px">${gr.shortCount} lapped/pulled not counted</div>` : ''}` : '<span class="muted">—</span>';
     return `<tr>
       <td><strong>${escapeHtml(gr.label)}</strong></td>
       <td class="mono">${st.n || 0}</td>
+      <td>${laps}</td>
       <td>${speed}${st.n ? `<div class="muted" style="font-size:11.5px">${fmtSpd(st.min)}–${fmtSpd(st.max)} km/h</div>` : ''}</td>
       <td><select onchange="importState.map[${k}] = +this.value; renderImportDialog()">${options}</select></td>
       <td>${now}</td>
     </tr>`;
   }).join('');
   const noDistance = res.columns.speed < 0 && res.columns.distance < 0 && res.columns.laps < 0;
+  let lapNote = '';
+  if (res.lapKm) {
+    const differs = raceType === 'circuit' && Math.abs(res.lapKm - lapLength) > 0.005;
+    lapNote = `<div class="callout${differs ? ' warn' : ''}"><span>This file's lap is <strong>${res.lapKm} km</strong> (worked out from best lap times and speeds), and speeds below use it.${differs ? ` Your race is set to ${lapLength} km. <button class="link-btn" onclick="useImportLap()">Use ${res.lapKm} km for this race</button>` : ''}</span></div>`;
+  } else if (res.columns.speed < 0 && res.columns.distance < 0 && res.columns.laps >= 0) {
+    lapNote = `<div class="callout"><span>Distances come from the <strong>Laps</strong> column × the current ${raceType === 'circuit' ? 'lap length' : 'race length'} (<strong>${lapLength} km</strong>). If these results were raced on a different course, set that length first.</span></div>`;
+  }
   openDialog('Import results', `
-    <p style="margin:0 0 12px;color:var(--text-2)"><strong>${escapeHtml(fileName)}</strong>: ${res.groups.reduce((s, g) => s + g.riders.length, 0)} finishers in ${res.groups.length} groups${res.skipped ? `, ${res.skipped} rows skipped (DNF, DNS or no time)` : ''}. Using columns: ${cols.map(escapeHtml).join(', ')}.</p>
-    ${res.columns.speed < 0 && res.columns.distance < 0 && res.columns.laps >= 0 ? `<div class="callout"><span>Distances come from the <strong>Laps</strong> column × the current lap length (<strong>${lapLength} km</strong>). If these results were raced on a different lap, set that lap length first.</span></div>` : ''}
+    <p style="margin:0 0 12px;color:var(--text-2)"><strong>${escapeHtml(fileName)}</strong>: ${res.groups.reduce((s, g) => s + g.riders.length, 0)} finishers in ${res.groups.length} groups${res.skipped ? `, ${res.skipped} rows skipped (DNF, DNS, DQ or no time)` : ''}. Using columns: ${cols.map(escapeHtml).join(', ')}.</p>
+    ${lapNote}
     ${noDistance ? `<div class="callout warn"><span>The file has no speed, distance or laps column, so speeds are worked out from each matched grade's <strong>current race distance</strong>. Make sure laps and lap length match the race these results came from.</span></div>` : ''}
     <div class="table-wrap"><table class="data">
-      <thead><tr><th>In file</th><th>Riders</th><th>Typical speed (km/h)</th><th>Apply to grade</th><th>Current</th></tr></thead>
+      <thead><tr><th>In file</th><th>Riders</th><th>Laps</th><th>Typical speed (km/h)</th><th>Grade</th><th>Current</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
-    <p class="field-hint" style="margin:10px 0 0">Speed is the median rider; the ± range covers the middle 80% of the field. Speeds outside 10–70 km/h are ignored.</p>
-    <label class="check" style="margin-top:6px"><input type="checkbox" id="import-ranges" checked> Also set each grade's ± range</label>
+    <p class="field-hint" style="margin:10px 0 0">Speed is the median rider who rode the full distance; the ± range covers the middle 80%. Lapped or pulled riders and speeds outside 10–70 km/h are left out.</p>
+    <label class="check" style="margin-top:6px"><input type="checkbox" id="import-ranges" checked> Also set each grade's ± range when applying speeds</label>
   `, `
-    <span style="flex:1"></span>
     <button class="btn" onclick="closeDialog()">Cancel</button>
+    <span style="flex:1"></span>
+    <button class="btn" onclick="compareWithPlan()" title="See how this race compared with your plan">Compare with plan</button>
     <button class="btn primary" onclick="applyImport()">Apply speeds</button>
   `);
 }
@@ -4795,6 +4873,171 @@ restoreStartupRace();
 })();
 // Redraw once web fonts are ready so canvas labels use them.
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => drawRace());
+
+// ---------- Post-race review ----------
+
+function useImportLap() {
+  if (!importState || !importState.res.lapKm) return;
+  document.getElementById('lap-length').value = importState.res.lapKm;
+  handleLapLengthChange();
+  renderImportDialog();
+}
+
+function compareWithPlan() {
+  if (!importState) return;
+  const { res, map, fileName } = importState;
+  reviewState = {
+    fileName,
+    lapKm: res.lapKm,
+    importedAt: Date.now(),
+    groups: res.groups.map((gr, k) => {
+      const st = importStats(k);
+      const g = map[k] >= 0 ? grades[map[k]] : null;
+      return {
+        label: gr.label,
+        gradeName: g ? g.name : null,
+        gradeIdx: g ? g.idx : -1,
+        fullLaps: gr.fullLaps,
+        shortCount: gr.shortCount,
+        n: st.n || 0,
+        median: st.n ? st.median : null,
+        speed: st.n ? st.speed : null,
+        range: st.n ? st.range : null,
+        winnerMinutes: st.n ? st.winnerMinutes : null,
+        medianMinutes: st.n ? st.medianMinutes : null
+      };
+    })
+  };
+  closeDialog();
+  showTab('review');
+  renderReview();
+  scheduleAutosave();
+}
+
+function validReview(r) {
+  return r && typeof r === 'object' && Array.isArray(r.groups) && r.groups.every(g => g && typeof g.label === 'string');
+}
+
+// Which current grade a reviewed group belongs to (by index, falling back to name).
+function reviewGrade(gr) {
+  if (gr.gradeIdx >= 0 && grades[gr.gradeIdx] && grades[gr.gradeIdx].name === gr.gradeName) return grades[gr.gradeIdx];
+  return gr.gradeName ? grades.find(g => g.name === gr.gradeName) || null : null;
+}
+
+function clearReview() {
+  reviewState = null;
+  renderReview();
+  scheduleAutosave();
+}
+
+function applyReviewSpeeds() {
+  if (!reviewState) return;
+  const rows = document.getElementById('grade-form').querySelectorAll('.grade-row');
+  let n = 0;
+  for (const gr of reviewState.groups) {
+    const g = reviewGrade(gr);
+    if (!g || !(gr.speed > 0)) continue;
+    const row = rows[g.idx];
+    if (!row) continue;
+    document.getElementById(`g${row.dataset.index}_spd`).value = gr.speed;
+    document.getElementById(`g${row.dataset.index}_range`).value = gr.range;
+    n++;
+  }
+  updateCourseSetup();
+  showToast(`<span class="t-ico">✓</span><span>Speeds and ranges updated for <strong>${n}</strong> grade${n === 1 ? '' : 's'} from the results</span>`);
+}
+
+function catchList(events, gs) {
+  if (!events.length) return '<div class="muted">No catches.</div>';
+  return events.map(ev => {
+    const a = gs[ev.c1Index], b = gs[ev.c2Index];
+    const x = warp.toX(ev.slowerDistance);
+    const where = raceType === 'circuit' ? `lap ${Math.floor(x / lapLength + 1e-9) + 1}` : `${x.toFixed(1)} km`;
+    return `<div class="rv-catch">${gradeDot(a.name, a.color, 'sm')} <strong>${escapeHtml(a.name)}</strong> ${raceType === 'circuit' && ev.lapsUp > 0 ? 'laps' : 'catches'} ${gradeDot(b.name, b.color, 'sm')} <strong>${escapeHtml(b.name)}</strong> <span class="mono">${toClock(ev.catchTime)}</span> <span class="muted">· ${where}</span></div>`;
+  }).join('');
+}
+
+function renderReview() {
+  const box = document.getElementById('review-content');
+  if (!box) return;
+  document.getElementById('review-ready').classList.toggle('show', !!reviewState);
+  if (!reviewState) {
+    box.innerHTML = `<div class="summary-placeholder">
+      <strong>No results to review yet</strong>
+      <span>After a race, download the results CSV (Sporthive / Speedhive, or any results file), choose <strong>Import results (CSV)</strong> under the grades, then <strong>Compare with plan</strong>.</span>
+    </div>`;
+    return;
+  }
+
+  const rowsData = reviewState.groups.map(gr => ({ gr, g: reviewGrade(gr) }));
+  const compared = rowsData.filter(r => r.g && r.gr.median);
+  const unmatched = rowsData.filter(r => !r.g || !r.gr.median).map(r => r.gr.label);
+
+  // What the model predicts with the speeds (and laps) that were actually ridden
+  const actualGrades = grades.map(g => {
+    const r = compared.find(x => x.g.idx === g.idx);
+    if (!r) return g;
+    const laps = raceType === 'circuit' && r.gr.fullLaps ? r.gr.fullLaps : g.laps;
+    return { ...g, spd: r.gr.median, laps, totalDistance: raceType === 'circuit' ? laps * lapLength : g.totalDistance };
+  });
+  const actualSim = SimCore.simulateRace({ grades: actualGrades, raceType, lapLength, afterCatch });
+
+  let sumSpeed = 0, sumFinish = 0, nFinish = 0, inRange = 0;
+  const rows = compared.map(({ gr, g }) => {
+    const diff = gr.median - g.spd;
+    sumSpeed += Math.abs(diff);
+    const within = g.range > 0 ? Math.abs(diff) <= g.range + 1e-9 : Math.abs(diff) < 0.05;
+    if (within) inRange++;
+    const tr = simResult.tracks[g.idx];
+    const planned = tr.finishClock;
+    const actual = gr.medianMinutes !== null ? g.start + gr.medianMinutes : null;
+    let finishDiff = '';
+    if (planned !== null && actual !== null) {
+      const d = actual - planned;
+      sumFinish += Math.abs(d); nFinish++;
+      finishDiff = `<span class="${Math.abs(d) < 1 ? 'muted' : d > 0 ? 'delta-up' : 'delta-down'}">${d >= 0 ? '+' : '−'}${formatSplit(Math.abs(d))}</span>`;
+    }
+    const lapsCell = raceType === 'circuit'
+      ? (gr.fullLaps && gr.fullLaps !== g.laps ? `<span class="delta-up">${gr.fullLaps}</span> <span class="muted">(plan ${g.laps})</span>` : `<span class="mono">${g.laps}</span>`)
+      : '';
+    return `<tr>
+      <td>${gradeChip(g.name, g.color)}<div class="muted" style="font-size:11.5px">${escapeHtml(gr.label)} · ${gr.n} rider${gr.n === 1 ? '' : 's'}${gr.shortCount ? `, ${gr.shortCount} lapped/pulled` : ''}</div></td>
+      ${raceType === 'circuit' ? `<td>${lapsCell}</td>` : ''}
+      <td class="mono">${fmtSpd(g.spd)}${g.range > 0 ? ` <span class="muted">±${g.range}</span>` : ''}</td>
+      <td class="mono"><strong>${fmtSpd(gr.median)}</strong> <span class="muted">±${gr.range}</span></td>
+      <td><span class="mono ${Math.abs(diff) < 0.05 ? 'muted' : diff > 0 ? 'delta-down' : 'delta-up'}">${diff >= 0 ? '+' : '−'}${fmtSpd(Math.abs(diff))}</span> ${within ? '<span class="pill done">in range</span>' : '<span class="pill out">outside</span>'}</td>
+      <td class="mono">${planned !== null ? toClock(planned) : '—'}</td>
+      <td class="mono">${actual !== null ? toClock(actual) : '—'}</td>
+      <td class="mono">${finishDiff}</td>
+    </tr>`;
+  }).join('');
+
+  const nC = compared.length;
+  const stat = (k, v, sub = '') => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="muted" style="font-size:12px;margin-top:2px">${sub}</div>` : ''}</div>`;
+  const when = new Date(reviewState.importedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+  box.innerHTML = `
+    <div class="panel-intro">
+      <p><strong>${escapeHtml(reviewState.fileName)}</strong>, imported ${escapeHtml(when)}${reviewState.lapKm ? ` · lap ${reviewState.lapKm} km from the file` : ''}. Actual finish is the median rider's time added to the grade's planned start, so it assumes grades started on time.</p>
+      <button class="btn" onclick="clearReview()">Clear</button>
+      <button class="btn primary" onclick="applyReviewSpeeds()">Update speeds from results</button>
+    </div>
+    <div class="stat-row">
+      ${stat('Grades compared', nC, unmatched.length ? `not matched: ${unmatched.map(escapeHtml).join(', ')}` : '')}
+      ${stat('Speed error', nC ? `${fmtSpd(sumSpeed / nC)} km/h` : '—', 'average, planned vs actual')}
+      ${stat('Within ± range', nC ? `${inRange}/${nC}` : '—', 'grades whose actual speed fell in the planned range')}
+      ${stat('Finish error', nFinish ? formatSplit(sumFinish / nFinish) : '—', 'average, min:sec')}
+    </div>
+    ${nC ? `<div class="table-wrap"><table class="data">
+      <thead><tr><th>Grade</th>${raceType === 'circuit' ? '<th>Laps ridden</th>' : ''}<th>Planned km/h</th><th>Actual km/h</th><th>Difference</th><th>Predicted finish</th><th>Actual finish</th><th>Off by</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>` : '<div class="callout warn"><span>No grades in the file are matched to grades in this race. Import again and choose a grade for each group.</span></div>'}
+    <div class="rv-catches">
+      <div><div class="scenario-result-head">Catches predicted by your plan (${simResult.events.length})</div>${catchList(simResult.events, grades)}</div>
+      <div><div class="scenario-result-head">Catches predicted with the actual speeds (${actualSim.events.length})</div>${catchList(actualSim.events, actualGrades)}</div>
+    </div>
+    <p class="field-hint" style="margin:12px 0 0">The results file has finishing times only, so actual catches during the race can't be confirmed from it. The right-hand list is what the model predicts once it knows the real speeds.</p>
+  `;
+}
 
 </script>
 </body>
