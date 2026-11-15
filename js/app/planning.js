@@ -249,7 +249,7 @@ function applyPlan() {
   updateCourseSetup();
   document.getElementById('plan-result').innerHTML =
     `<div class="callout"><span><strong>Plan applied.</strong> The track, Catch log and Race sheet now use the planned starts${raceType === 'circuit' ? ' and laps' : ''}.</span></div>`;
-  showToast(`<span class="t-ico">✓</span><span>Planned start times applied to <strong>${escapeHtml(raceName)}</strong></span>`);
+  showUndoToast(`<span class="t-ico">✓</span><span>Plan applied to <strong>${escapeHtml(raceName)}</strong></span>`);
 }
 
 // ---------- Race-day sheet ----------
@@ -346,6 +346,8 @@ function buildRaceSheet() {
     </div>
     <h2>Start list</h2>
     <table><thead><tr><th>Grade</th><th>Start</th><th>Distance</th><th>Speed</th>${extraHead}<th>Expected finish</th></tr></thead><tbody>${startRows}</tbody></table>
+    <h2>Timeline</h2>
+    <div class="sheet-timeline">${buildTimelineSVG(700, { print: true })}</div>
     <h2>Predicted catches (${catchEvents.length})</h2>
     ${catchEvents.length ? `<table><thead><tr><th>Time</th><th>Catcher</th><th>Caught</th><th>Type</th><th>Where</th></tr></thead><tbody>${catchRows}</tbody></table>` : '<p>No catches predicted at the planned speeds.</p>'}
     ${riskHTML}

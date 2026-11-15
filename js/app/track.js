@@ -125,6 +125,7 @@ function drawRace() {
   markerScale = Math.max(1, Math.min(2.2, (CW / shown) * 0.75));
   drawRaceOn(ctx, CW, CH, raceStartMinutes + raceElapsed, true);
   markerScale = 1;
+  updateTimelinePlayhead();
 }
 
 // withOverlays = false draws the canvas only (used for catch snapshots).

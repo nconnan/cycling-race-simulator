@@ -122,6 +122,7 @@ body {
 .mono, .race-clock { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
 button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
 
 /* ---------- App bar ---------- */
 .appbar {
@@ -447,6 +448,7 @@ th.sort-desc::after { content: "↓"; opacity: 1; color: var(--accent); }
 
 /* ---------- Toasts ---------- */
 #toasts { position: fixed; top: 76px; right: 20px; z-index: 80; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast { pointer-events: auto; }
 .toast {
   display: flex; align-items: center; gap: 10px; padding: 10px 14px; min-width: 240px; max-width: 360px;
   background: var(--surface); color: var(--text); border: 1px solid var(--border); border-left: 4px solid var(--warn);
@@ -644,3 +646,90 @@ select {
 .spark span { width: 5px; border-radius: 2px; background: var(--accent); opacity: .75; }
 .rv-start { height: 30px; width: 116px; font-size: 12.5px; }
 .rv-start.changed { border-color: var(--warn); }
+
+/* ---------- v11.6: timeline, grouped tabs, compact grades, undo, wizard ---------- */
+.side-tools { display: flex; gap: 6px; }
+.side-tools .btn { flex: none; }
+.toast-undo { margin-left: auto; border: 0; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 12.5px; padding: 5px 10px; border-radius: 7px; cursor: pointer; }
+.toast-undo:hover { background: var(--accent); color: var(--accent-ink); }
+
+/* View toggle and timeline */
+.view-toggle { margin-left: 8px; }
+.view-toggle button { min-width: 74px; }
+.timeline-wrap { position: relative; margin: 0 18px; padding: 10px 6px 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.timeline-plot { width: 100%; min-height: 220px; touch-action: pan-y; }
+.timeline-plot svg { display: block; width: 100%; height: auto; }
+.timeline-plot .tl-bar { cursor: grab; }
+.timeline-plot .tl-bar:focus { outline: none; }
+.timeline-plot .tl-bar:focus-visible rect, .timeline-plot .tl-bar.dragging rect { stroke: var(--accent); stroke-width: 3; stroke-opacity: 1; }
+.timeline-plot.dragging, .timeline-plot.dragging .tl-bar { cursor: grabbing; }
+.timeline-plot .tl-catch { cursor: help; }
+.timeline-summary { margin: 6px 6px 2px; font-size: 12px; color: var(--muted); }
+.tl-tip { position: absolute; z-index: 5; pointer-events: none; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-lg); padding: 6px 10px; font-size: 12px; white-space: nowrap; }
+
+/* Grouped tabs */
+.tabbar { display: flex; align-items: center; gap: 12px; padding: 10px 12px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.tabbar .tabs { border-bottom: 0; padding: 0; flex: 1; min-width: 0; }
+.tabgroups { flex: none; margin-bottom: 8px; }
+.tabgroups button { display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; }
+.tabgroups svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Grades: toolbar and compact table layout */
+.grades-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.grades-toolbar .seg button { min-width: 64px; }
+.grade-table-head, #grade-form.compact .grade-row {
+  display: grid; grid-template-columns: 18px minmax(38px, 1fr) 82px 38px 52px 40px 22px; gap: 4px; align-items: center;
+}
+.grade-table-head.no-laps, #grade-form.compact .grade-row:has(.gr-fields.no-laps) { grid-template-columns: 18px minmax(38px, 1fr) 82px 52px 40px 22px; }
+.grade-table-head.no-laps .th-laps { display: none; }
+.grade-table-head { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 0 6px 4px 10px; }
+.grade-table-head span { padding-left: 6px; }
+#grade-form.compact { gap: 4px; }
+#grade-form.compact .grade-row { padding: 4px 6px 4px 10px; border-radius: 8px; }
+#grade-form.compact .grade-row::before { top: 6px; bottom: 6px; width: 3px; }
+#grade-form.compact .gr-top, #grade-form.compact .gr-fields, #grade-form.compact .mini { display: contents; }
+#grade-form.compact .swatch { width: 18px; height: 22px; border-radius: 5px; grid-column: 1; }
+#grade-form.compact .mv-up, #grade-form.compact .mv-down { display: none; }
+#grade-form.compact input[type="time"]::-webkit-calendar-picker-indicator { display: none; }
+#grade-form.compact input[type="number"] { -moz-appearance: textfield; }
+#grade-form.compact input[type="number"]::-webkit-inner-spin-button, #grade-form.compact input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+#grade-form.compact .gr-name { grid-column: 2; }
+#grade-form.compact .gr-actions { order: 9; grid-column: -2; }
+#grade-form.compact .gr-actions .icon-btn { width: 22px; height: 26px; }
+#grade-form.compact .gr-actions { justify-self: end; }
+#grade-form.compact input[type="text"], #grade-form.compact input[type="number"], #grade-form.compact input[type="time"] { height: 30px; font-size: 12.5px; padding: 0 6px; }
+#grade-form.compact .input-unit input { padding-right: 6px; }
+#grade-form.compact .input-unit .unit { display: none; }
+#grade-form.compact .mini > span:first-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+#grade-form.compact .mini.prev { display: none; }
+
+/* Wizard */
+.wz-steps { display: flex; gap: 6px; list-style: none; margin: 0 0 16px; padding: 0; flex-wrap: wrap; }
+.wz-steps li { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--muted); padding: 4px 10px 4px 4px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); }
+.wz-steps li span { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; background: var(--surface-3); }
+.wz-steps li.on { color: var(--text); border-color: var(--accent); }
+.wz-steps li.on span { background: var(--accent); color: var(--accent-ink); }
+.wz-steps li.done span { background: var(--ok-soft); color: var(--ok); }
+.wz-lead { margin: 0 0 12px; color: var(--text-2); }
+.wz-grades input[type="text"], .wz-grades input[type="number"] { height: 30px; width: 76px; }
+.wz-grades td { padding: 6px 8px; }
+
+/* Race sheet timeline */
+.sheet .sheet-timeline svg { width: 100%; height: auto; }
+
+@media (max-width: 1280px) { .appbar-race { display: none; } }
+@media (max-width: 640px) {
+  /* Section groups become a bottom bar on phones */
+  .tabgroups {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; margin: 0; border-radius: 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); padding: 6px max(10px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+    background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 0; border-top: 1px solid var(--border);
+  }
+  .tabgroups button { flex-direction: column; height: 48px; gap: 2px; font-size: 11px; }
+  .tabgroups svg { width: 20px; height: 20px; }
+  body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  #toasts { top: auto; bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .view-toggle { margin-left: 0; }
+  .timeline-wrap { margin: 0 12px; }
+}

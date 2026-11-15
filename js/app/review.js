@@ -71,7 +71,7 @@ function applyReviewSpeeds() {
     n++;
   }
   updateCourseSetup();
-  showToast(`<span class="t-ico">✓</span><span>Speeds and ranges updated for <strong>${n}</strong> grade${n === 1 ? '' : 's'} from the results</span>`);
+  showUndoToast(`<span class="t-ico">✓</span><span>Speeds and ranges updated for <strong>${n}</strong> grade${n === 1 ? '' : 's'} from the results</span>`);
 }
 
 function catchList(events, gs) {
@@ -382,7 +382,7 @@ function applyHistorySuggest() {
   historyRecent = st.recent;
   closeDialog();
   updateCourseSetup();
-  showToast(`<span class="t-ico">✓</span><span>Speeds for <strong>${n}</strong> grade${n === 1 ? '' : 's'} from ${escapeHtml(st.course)}</span>`);
+  showUndoToast(`<span class="t-ico">✓</span><span>Speeds for <strong>${n}</strong> grade${n === 1 ? '' : 's'} from ${escapeHtml(st.course)}</span>`);
 }
 
 // Add a reviewed race to your own course history

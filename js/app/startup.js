@@ -12,10 +12,12 @@ updateAfterCatchHint();
 setupGradeInputs();
 updateCourseSetup();
 restoreStartupRace();
-(function restoreTab() {
-  let tab = null;
-  try { tab = localStorage.getItem('crs-tab'); } catch (e) {}
-  if (tab && document.getElementById(`tab-${tab}`)) showTab(tab);
+(function restoreView() {
+  let tab = null, view = null, layout = null;
+  try { tab = localStorage.getItem('crs-tab'); view = localStorage.getItem('crs-view'); layout = localStorage.getItem('crs-grade-layout'); } catch (e) {}
+  showTab(tab && document.getElementById(`tab-${tab}`) ? tab : 'standings');
+  setGradeLayout(layout === 'table' ? 'table' : 'cards');
+  setTrackView(view === 'timeline' ? 'timeline' : 'track');
 })();
 // Redraw once web fonts are ready so canvas labels use them.
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => drawRace());

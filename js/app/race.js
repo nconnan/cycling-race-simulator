@@ -172,7 +172,9 @@ function resetAllSetup() {
     setupGradeInputs();
 
     // Rebuild the race from the default grades, as on first load.
+    raceElapsed = 0;
     updateCourseSetup();
+    showUndoToast(`<span class="t-ico">↺</span><span>Setup reset to the defaults</span>`);
   }
 }
 
@@ -511,8 +513,14 @@ function updateCourseSetup() {
   renderReview();
   scheduleAutosave();
   updateHeaderMeta();
+  // Keep the playback position (paused) instead of jumping back to the start
+  const keepAt = raceElapsed;
   resetRace();
+  if (keepAt > 0) restorePlayhead(keepAt);
   drawStagingArea();
+  if (typeof setGradeLayout === 'function') document.getElementById('grade-table-head').classList.toggle('no-laps', raceType !== 'circuit');
+  renderTimeline();
+  recordSetup();
 }
 
 function drawStagingArea() {

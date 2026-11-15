@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Professional Cycling Race Simulator v11.5.1</title>
+<title>Professional Cycling Race Simulator v11.6.0</title>
 <meta name="description" content="Plan graded cycling races: predict catches, plan start gaps and print a race-day sheet.">
 <meta name="theme-color" content="#f2f4f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#090d16" media="(prefers-color-scheme: dark)">
@@ -24,7 +24,7 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="16.5" r="3.5"/><circle cx="18.5" cy="16.5" r="3.5"/><path d="M5.5 16.5 9 9h6l3.5 7.5M9 9l3 7.5h-6.5M12 16.5 15 9M14 6h2.5"/></svg>
     </div>
     <div>
-      <div class="brand-title">Cycling Race Simulator <span class="ver app-version" title="Version 11.5.1, updated 15 November 2026">v11.5.1</span></div>
+      <div class="brand-title">Cycling Race Simulator <span class="ver app-version" title="Version 11.6.0, updated 15 November 2026">v11.6.0</span></div>
       <div class="brand-sub">Graded race planning, catch prediction &amp; start-gap planner</div>
     </div>
   </div>
@@ -34,6 +34,10 @@
     <span id="appbar-race-meta"></span>
   </div>
   <div class="appbar-actions">
+    <button class="btn" onclick="openWizard()" title="Set up a new race step by step">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      <span class="lbl">New race</span>
+    </button>
     <button class="btn" onclick="printRaceSheet()" title="Print the race-day sheet or save it as PDF">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/></svg>
       <span class="lbl">Race sheet</span>
@@ -57,6 +61,10 @@
 
 <div class="layout">
   <aside class="sidebar">
+    <div class="side-tools" role="toolbar" aria-label="Edit history">
+      <button class="btn sm" id="undoBtn" onclick="undoSetup()" disabled title="Undo the last change (Ctrl/⌘ Z)"><span aria-hidden="true">↶</span> Undo</button>
+      <button class="btn sm" id="redoBtn" onclick="redoSetup()" disabled title="Redo (Ctrl/⌘ Shift Z)"><span aria-hidden="true">↷</span> Redo</button>
+    </div>
     <section class="panel">
       <button class="panel-head" onclick="toggleRaceConfigSection()" aria-controls="config-content">
         <h2>Race setup</h2>
@@ -130,6 +138,16 @@
         <span class="chev open" id="grades-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg></span>
       </button>
       <div class="collapsible-content open" id="grades-content">
+        <div class="grades-toolbar">
+          <div class="seg" role="group" aria-label="Grade layout">
+            <button type="button" class="layout-btn active" data-layout="cards" onclick="setGradeLayout('cards')" aria-pressed="true">Cards</button>
+            <button type="button" class="layout-btn" data-layout="table" onclick="setGradeLayout('table')" aria-pressed="false">Table</button>
+          </div>
+          <span class="field-hint" id="grades-hint">Paste rows from a spreadsheet into any cell.</span>
+        </div>
+        <div class="grade-table-head" id="grade-table-head" hidden aria-hidden="true">
+          <span></span><span>Grade</span><span>Start</span><span class="th-laps">Laps</span><span>km/h</span><span>±</span><span></span>
+        </div>
         <form id="grade-form" onsubmit="event.preventDefault();"></form>
       </div>
     </section>
@@ -139,18 +157,27 @@
     <section class="card">
       <div class="card-head">
         <div>
-          <h2>Live track</h2>
+          <h2 id="track-title">Live track</h2>
           <div class="card-sub" id="track-sub"></div>
+        </div>
+        <div class="seg view-toggle" role="group" aria-label="View">
+          <button type="button" class="view-btn active" data-view="track" onclick="setTrackView('track')" aria-pressed="true">Track</button>
+          <button type="button" class="view-btn" data-view="timeline" onclick="setTrackView('timeline')" aria-pressed="false">Timeline</button>
         </div>
         <div class="on-deck">
           <span class="label">On course</span>
           <div id="staging-area"></div>
         </div>
       </div>
-      <div class="track-wrap">
+      <div class="track-wrap" id="track-view">
         <canvas id="raceCanvas" width="960" height="500" aria-label="Race track"></canvas>
         <div id="lap-counters"></div>
         <div id="finish-flag" class="finish-flag"><span class="flag-icon"></span><span id="finish-grade-name"></span></div>
+      </div>
+      <div class="timeline-wrap" id="timeline" hidden>
+        <div class="timeline-plot" id="timeline-plot"></div>
+        <div class="tl-tip" id="timeline-tip" hidden></div>
+        <p class="timeline-summary" id="timeline-summary"></p>
       </div>
       <div class="transport">
         <div class="transport-buttons">
@@ -182,22 +209,29 @@
     </section>
 
     <section class="card">
-      <div class="tabs" role="tablist">
-        <button class="tab active" data-tab="standings" onclick="showTab('standings')" role="tab">Standings</button>
-        <button class="tab" data-tab="catches" onclick="showTab('catches')" role="tab">Catch log <span class="count" id="catch-count">0</span></button>
-        <button class="tab" data-tab="risk" onclick="showTab('risk')" role="tab">Catch risk</button>
-        <button class="tab" data-tab="planner" onclick="showTab('planner')" role="tab">Start planner</button>
-        <button class="tab" data-tab="whatif" onclick="showTab('whatif')" role="tab">What-if</button>
-        <button class="tab" data-tab="summary" onclick="showTab('summary')" role="tab">Race summary <span class="ready-dot" id="summary-ready"></span></button>
-        <button class="tab" data-tab="review" onclick="showTab('review')" role="tab">Review <span class="ready-dot" id="review-ready"></span></button>
-        <button class="tab" data-tab="history" onclick="showTab('history')" role="tab">History</button>
+      <div class="tabbar">
+        <div class="seg tabgroups" role="tablist" aria-label="Sections">
+          <button type="button" class="tabgroup active" data-group="race" onclick="showGroup('race')" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l4-8h5l3 8M10 9l2-3"/></svg><span>Race</span></button>
+          <button type="button" class="tabgroup" data-group="plan" onclick="showGroup('plan')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h10M4 19h6"/><circle cx="18" cy="16" r="3"/></svg><span>Plan</span></button>
+          <button type="button" class="tabgroup" data-group="learn" onclick="showGroup('learn')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg><span>Learn</span></button>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Views">
+          <button class="tab active" data-tab="standings" onclick="showTab('standings')" role="tab" aria-controls="tab-standings">Standings</button>
+          <button class="tab" data-tab="catches" onclick="showTab('catches')" role="tab" aria-controls="tab-catches">Catch log <span class="count" id="catch-count">0</span></button>
+          <button class="tab" data-tab="summary" onclick="showTab('summary')" role="tab" aria-controls="tab-summary">Race summary <span class="ready-dot" id="summary-ready"></span></button>
+          <button class="tab" data-tab="planner" onclick="showTab('planner')" role="tab" aria-controls="tab-planner">Start planner</button>
+          <button class="tab" data-tab="risk" onclick="showTab('risk')" role="tab" aria-controls="tab-risk">Catch risk</button>
+          <button class="tab" data-tab="whatif" onclick="showTab('whatif')" role="tab" aria-controls="tab-whatif">What-if</button>
+          <button class="tab" data-tab="review" onclick="showTab('review')" role="tab" aria-controls="tab-review">Review <span class="ready-dot" id="review-ready"></span></button>
+          <button class="tab" data-tab="history" onclick="showTab('history')" role="tab" aria-controls="tab-history">History</button>
+        </div>
       </div>
 
-      <div class="tab-panel active" id="tab-standings">
+      <div class="tab-panel active" id="tab-standings" role="tabpanel">
         <div id="finish-section"></div>
       </div>
 
-      <div class="tab-panel" id="tab-catches">
+      <div class="tab-panel" id="tab-catches" role="tabpanel">
         <div class="table-wrap">
           <table class="data" id="catchTable">
             <thead>
@@ -208,12 +242,12 @@
         </div>
       </div>
 
-      <div class="tab-panel" id="tab-risk">
+      <div class="tab-panel" id="tab-risk" role="tabpanel">
         <div class="callout" id="risk-intro"></div>
         <div id="risk-result"></div>
       </div>
 
-      <div class="tab-panel" id="tab-planner">
+      <div class="tab-panel" id="tab-planner" role="tabpanel">
         <div class="callout"><span>Suggests start times (or, with a fixed gap, lap counts) that keep your rule, and applies them to the race in one click. Every pair of grades is checked. With speed ranges allowed for, the plan must hold for the fastest and slowest speed in each grade's ± range. You can lock grades to their current start and set a time everyone must have finished by. Start times are whole minutes.</span></div>
         <div class="planner-form">
           <label class="field">
@@ -277,7 +311,7 @@
         <div id="plan-result"></div>
       </div>
 
-      <div class="tab-panel" id="tab-whatif">
+      <div class="tab-panel" id="tab-whatif" role="tabpanel">
         <div class="scenario-panel" id="scenario-panel">
           <div class="panel-intro">
             <p>Adjust grade speeds to see predicted outcomes. All adjustments are considered together, using the current after-catch setting; the live race is not changed.</p>
@@ -287,15 +321,15 @@
         </div>
       </div>
 
-      <div class="tab-panel" id="tab-review">
+      <div class="tab-panel" id="tab-review" role="tabpanel">
         <div id="review-content"></div>
       </div>
 
-      <div class="tab-panel" id="tab-history">
+      <div class="tab-panel" id="tab-history" role="tabpanel">
         <div id="history-content"></div>
       </div>
 
-      <div class="tab-panel" id="tab-summary">
+      <div class="tab-panel" id="tab-summary" role="tabpanel">
         <div class="summary-placeholder" id="summary-placeholder">
           <strong>Summary not available yet</strong>
           <span>Play or scrub the race to the end to see the full statistics.</span>
@@ -326,7 +360,7 @@
 
 <footer class="footer-section">
   <div class="copyright">Copyright © <span id="copyright-year">2025</span> Nicholas Connan. All Rights Reserved.</div>
-  <div class="app-version-line">Version 11.5.1 · updated 15 November 2026</div>
+  <div class="app-version-line">Version 11.6.0 · updated 15 November 2026</div>
   <div class="disclaimer">Disclaimer: This cycling race simulator is for conceptual planning and visualization purposes only. It does not provide accurate or reliable data on real-world race dynamics, environmental factors, or athlete performance and should be used with caution for actual race planning or decision-making.</div>
 </footer>
 
@@ -371,6 +405,7 @@
 <script src="js/app/library.js"></script>
 <script src="js/app/course-map.js"></script>
 <script src="js/app/review.js"></script>
+<script src="js/app/ux.js"></script>
 <script src="js/app/startup.js"></script>
 <script>
   // Offline support when served over http(s); skipped for a file opened from disk.

@@ -14,6 +14,16 @@ Plan graded cycling races: predict when grades catch each other, plan start gaps
 - **Smooth playback**: markers are redrawn in step with the screen's refresh rate and leave a short fading trail. At 1×, playback slows down for short courses so the fastest grade takes about 8 seconds per lap (15 seconds per course for other race types). Long courses keep the old maximum rate. Speeds are ½×, 1×, 2×, 4× and 8×, and a line under the speed buttons shows how long the whole race takes to play.
 - **"On course" strip**: one fixed-height row that scrolls sideways, so the track no longer jumps when many grades are racing.
 
+## New in v11.6: professional UI pass
+
+- **Race timeline** (Live track → *Timeline*): one bar per grade from start to finish, with lap ticks, the bell lap (▲), catches (a red line from catcher to caught; dashed when lapping), the finish-by deadline and the playhead. **Drag a bar** to change that grade's start and watch the catches move, or focus a bar and use ← → (Shift for 5 minutes). The timeline is also printed on the race sheet.
+- **Grouped tabs:** **Race** (Standings, Catch log, Summary), **Plan** (Start planner, Catch risk, What-if) and **Learn** (Review, History). On phones the three groups are a bottom bar. Arrow keys move between tabs.
+- **Undo / Redo** (above Race setup, or Ctrl/⌘ Z and Ctrl/⌘ Shift Z) for every setup change. Bigger actions (applying a plan, speeds from history or results, a pasted table, the wizard, reset) show a confirmation with an **Undo** button.
+- **Calmer editing:** changing the setup keeps the playback position instead of jumping back to the start.
+- **Compact grade table** (Grades → *Table*): one line per grade (colour, name, start, laps, km/h, ±). **Paste rows from a spreadsheet** into any cell, with columns name, start, laps, speed and ±, starting from the cell you paste into; extra rows add grades.
+- **New race wizard** (header → *New race*): course (with its history), then grades (speeds, ± and laps prefilled from that course), then the planner's rule, then a check of the plan before creating the race.
+- **Accessibility:** grade labels pick dark or white text by WCAG contrast (yellow and white grades now get dark text). Dialogs keep keyboard focus inside and return it on close. Tabs use proper tab roles. View and layout choices are remembered.
+
 ## New in v11.5: course speed history
 
 - **Built-in club history:** speeds from 195 of Peel District Cycling Club's lap races on Sporthive, 2016–2026, across about 30 courses. It holds finishing speeds only, with no names (`js/history-data.js`).
@@ -95,6 +105,7 @@ js/app/                  page scripts, loaded in this order by index.html:
   library.js               race data, dialogs, library, share links, results import
   course-map.js            GPX course maps and hills
   review.js                post-race review and course history
+  ux.js                    undo/redo, grouped tabs, timeline, compact grades, wizard
   startup.js               start-up (must stay last)
 sw.js                    offline cache (service worker)
 manifest.webmanifest     install metadata

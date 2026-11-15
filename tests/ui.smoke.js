@@ -247,6 +247,68 @@ async function exercise(page, label) {
   check(await page.evaluate(() => !/Rider \d/.test(JSON.stringify(userHistory()))), 'history has no riders\' names');
   await page.evaluate(() => resetAllSetup());
 
+  // ---- v11.6: undo, calmer reset, grouped tabs, timeline, compact grades, wizard, contrast ----
+  await page.evaluate(() => resetAllSetup());
+  await setInput(page, 'g0_spd', '45');
+  check(await page.evaluate(() => grades[0].spd === 45 && !document.getElementById('undoBtn').disabled), 'undo available after a change');
+  await page.evaluate(() => undoSetup());
+  check(await page.evaluate(() => grades[0].spd === 42), 'undo restores the previous speed');
+  await page.evaluate(() => redoSetup());
+  check(await page.evaluate(() => grades[0].spd === 45), 'redo re-applies it');
+  await scrubTo(page, 600);
+  await setInput(page, 'g1_name', 'Bee');
+  check(await page.evaluate(() => Math.abs(raceElapsed - 6) < 0.02), 'editing keeps the playback position');
+
+  await page.evaluate(() => showTab('risk'));
+  const tabs = await page.evaluate(() => [document.querySelector('.tabgroup.active').dataset.group, [...document.querySelectorAll('.tab')].filter(t => !t.hidden).map(t => t.dataset.tab).join(',')]);
+  check(tabs[0] === 'plan' && tabs[1] === 'planner,risk,whatif', `tabs grouped (${tabs.join(' | ')})`);
+  await page.evaluate(() => showGroup('learn'));
+  check(await page.evaluate(() => document.querySelector('.tab.active').dataset.tab === 'review' && document.querySelector('.tab.active').getAttribute('aria-selected') === 'true'), 'group switch opens its first tab');
+
+  await setInput(page, 'g4_start', '09:00'); await setInput(page, 'g0_start', '09:06');
+  await page.evaluate(() => setTrackView('timeline'));
+  const tl = await page.evaluate(() => [document.querySelectorAll('#timeline-plot .tl-bar').length, document.querySelectorAll('#timeline-plot .tl-catch').length, catchEvents.length, document.getElementById('track-view').hidden]);
+  check(tl[0] === 5 && tl[1] === tl[2] && tl[3], `timeline: ${tl[0]} bars, ${tl[1]} catch markers (${tl[2]} catches)`);
+  await page.focus('#timeline-plot .tl-bar[data-idx="1"]');
+  await page.keyboard.press('ArrowRight');
+  check(await page.evaluate(() => grades[1].start === fromClock('09:03')), 'arrow key moves a start by a minute');
+  await page.evaluate(() => document.querySelector('#timeline-plot .tl-bar[data-idx="2"]').scrollIntoView({ block: 'center' }));
+  const box = await page.locator('#timeline-plot .tl-bar[data-idx="2"] rect').boundingBox();
+  const ppm = await page.evaluate(() => { const l = document.getElementById('tl-playhead'); const svg = document.querySelector('#timeline-plot svg'); return (+l.dataset.plotw / (+l.dataset.hi - +l.dataset.lo)) * svg.getBoundingClientRect().width / svg.viewBox.baseVal.width; });
+  await page.mouse.move(box.x + 10, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 10 + ppm * 3, box.y + box.height / 2, { steps: 6 });
+  await page.mouse.up();
+  const dragged = await page.evaluate(() => toClock(grades[2].start));
+  check(dragged === '09:07', `dragging a bar moves its start (+3 min → ${dragged})`);
+  await page.evaluate(() => setTrackView('track'));
+
+  await page.evaluate(() => setGradeLayout('table'));
+  check(await page.evaluate(() => document.getElementById('grade-form').classList.contains('compact') && document.querySelector('.grade-row').getBoundingClientRect().height < 50), 'compact table: one line per grade');
+  await page.evaluate(() => {
+    const el = document.getElementById(`g${document.querySelectorAll('.grade-row')[0].dataset.index}_name`);
+    const dt = new DataTransfer(); dt.setData('text/plain', 'Elite\t8:00\t10\t43.5\t1.5\nReserve\t08:04 AM\t8\t39\t1\n');
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  const pasted = await page.evaluate(() => grades.slice(0, 2).map(g => [g.name, toClock(g.start), g.laps, g.spd, g.range].join(' ')));
+  check(pasted[0] === 'Elite 08:00 10 43.5 1.5' && pasted[1] === 'Reserve 08:04 8 39 1', `paste from a spreadsheet (${pasted.join(' / ')})`);
+  await page.evaluate(() => setGradeLayout('cards'));
+
+  await page.evaluate(() => { openWizard(); document.getElementById('wz-course').value = 'Rockingham Smeaton Way'; wizCourseChanged('Rockingham Smeaton Way'); wizGo(1); });
+  const wzGrades = await page.evaluate(() => wiz.grades.filter(g => g.include).map(g => g.name + ' ' + g.spd).join(', '));
+  check(/^B 4\d/.test(wzGrades) && /Open 4\d/.test(wzGrades) && wzGrades.split(',').length === 5, `wizard picks the grades racing there recently (${wzGrades})`);
+  await page.evaluate(() => { wizGo(1); document.getElementById('wz-rule').value = 'final'; wizGo(1); });
+  check(await page.evaluate(() => wiz.step === 3 && document.querySelectorAll('#dialogBody tbody tr').length === 5), 'wizard shows the plan to check');
+  await page.evaluate(() => wizCreate());
+  check(await page.evaluate(() => raceName === 'Club race' && grades.length === 5 && Math.abs(lapLength - 1.7) < 0.2 && historyCourse === 'Rockingham Smeaton Way'), 'wizard creates the race');
+  await page.evaluate(() => undoSetup());
+  check(await page.evaluate(() => raceName !== 'Club race'), 'wizard can be undone');
+
+  check(await page.evaluate(() => textColorFor('#ffd600') !== '#fff' && textColorFor('#ffffff') !== '#fff' && textColorFor('#1976d2') === '#fff'), 'grade text colour has readable contrast');
+  await page.evaluate(() => { document.getElementById('print-sheet').innerHTML = buildRaceSheet(); });
+  check(await page.evaluate(() => document.querySelectorAll('#print-sheet .sheet-timeline svg rect').length >= 5), 'race sheet includes the timeline');
+  await page.evaluate(() => resetAllSetup());
+
   // Playback: animation frames, smooth and course-aware
   await page.evaluate(() => { resetRace(); setSpeed(1); playRace(); });
   await page.waitForTimeout(1500);

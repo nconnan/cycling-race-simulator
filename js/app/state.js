@@ -3,7 +3,7 @@
  * The race maths lives in js/core.js (SimCore) and is covered by tests/core.test.js.
  */
 // Release version and date. Keep in step with package.json and sw.js (a test checks).
-const APP_VERSION = '11.5.1';
+const APP_VERSION = '11.6.0';
 const APP_UPDATED = '2026-11-15';
 
 function appUpdatedLabel() {
@@ -105,14 +105,14 @@ function safeColor(color, fallback = '#1976d2') {
 }
 
 // Grey text on very light markers (e.g. white), white text otherwise.
+// Dark or white text on a grade colour, whichever has more contrast (WCAG relative luminance).
 function textColorFor(color) {
   let hex = safeColor(color, '#000000').slice(1);
   if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.85 ? '#5b6474' : '#fff';
+  const lin = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * lin(parseInt(hex.slice(0, 2), 16)) + 0.7152 * lin(parseInt(hex.slice(2, 4), 16)) + 0.0722 * lin(parseInt(hex.slice(4, 6), 16));
+  const withWhite = 1.05 / (L + 0.05), withDark = (L + 0.05) / 0.0617; // dark text #1f2533
+  return withDark > withWhite ? '#1f2533' : '#fff';
 }
 
 function gradeDot(name, color, cls = '') {
@@ -207,7 +207,23 @@ function toggleTheme() {
 // ---------- Tabs ----------
 
 function showTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  if (!document.getElementById(`tab-${name}`)) name = 'standings';
+  const group = typeof groupOfTab === 'function' ? groupOfTab(name) : 'race';
+  if (typeof lastTabInGroup === 'object') lastTabInGroup[group] = name;
+  document.querySelectorAll('.tabgroup').forEach(b => {
+    const on = b.dataset.group === group;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on);
+    b.tabIndex = on ? 0 : -1;
+  });
+  document.querySelectorAll('.tab').forEach(t => {
+    const on = t.dataset.tab === name;
+    const inGroup = typeof TAB_GROUPS === 'object' ? TAB_GROUPS[group].includes(t.dataset.tab) : true;
+    t.hidden = !inGroup;
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-selected', on);
+    t.tabIndex = on ? 0 : -1;
+  });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
   try { localStorage.setItem('crs-tab', name); } catch (e) {}
 }

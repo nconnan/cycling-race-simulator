@@ -116,6 +116,7 @@ function applyRaceData(data) {
   // updateCourseSetup() rebuilds the baseline and resets the adjustments,
   // so keep the saved adjustments and re-apply them afterwards.
   const savedAdjustments = Array.isArray(data.scenarioAdjustments) ? data.scenarioAdjustments : [];
+  raceElapsed = 0;
   updateCourseSetup();
   savedAdjustments.forEach((adj, i) => {
     adj = Math.max(-4, Math.min(4, Math.round(+adj) || 0));
@@ -206,6 +207,7 @@ function openLibrary() {
     <div class="lib-list">${items}</div>
     <p class="field-hint" style="margin:12px 0 0">Saved in this browser on this device. To move a race to another device, download it as a file or share a link.</p>
   `, `
+    <button class="btn" onclick="openWizard()">New race…</button>
     <button class="btn" onclick="closeDialog(); loadRace()">Open file…</button>
     <button class="btn" onclick="closeDialog(); saveRace()">Download file</button>
     <span style="flex:1"></span>
@@ -417,5 +419,5 @@ function applyImport() {
   });
   closeDialog();
   updateCourseSetup();
-  showToast(`<span class="t-ico">✓</span><span>Speeds updated for <strong>${n}</strong> grade${n === 1 ? '' : 's'}</span>`);
+  showUndoToast(`<span class="t-ico">✓</span><span>Speeds updated for <strong>${n}</strong> grade${n === 1 ? '' : 's'}</span>`);
 }
