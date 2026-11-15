@@ -2,7 +2,7 @@
 
 **© Nicholas J. F. Connan. All rights reserved.** See [LICENSE](LICENSE).
 
-**Who can change this repository:** only the owner updates `main`, which is what the live site is built from. Claude can push only to `claude/…` branches and propose changes as pull requests. Each pull request is tested automatically, and goes live only when the owner merges it. The automated workflow has read-only access. Repository rulesets enforce this; see *Repository protection* below.
+**Who can change this repository:** only the owner, and Claude acting on the owner's behalf through the owner's GitHub account. Repository rulesets block everyone else, including collaborators, other apps and other keys. The automated workflow has read-only access. Pull requests are tested automatically, and only the owner (or Claude for the owner) can merge them. See *Repository protection* below.
 
 Plan graded cycling races: predict when grades catch each other, plan start gaps that avoid catches, and print a race-day sheet for the commissaire.
 
@@ -158,9 +158,9 @@ Predictions are for planning only. They don't account for terrain, weather, cras
 
 ## Repository protection
 
-Two branch rulesets (Settings → Rules → Rulesets), both with **Repository admin** on the bypass list (the owner):
+Two branch rulesets (Settings → Rules → Rulesets), each with **Repository admin → Always allow** on the bypass list:
 
-1. **Main: owner only:** target the default branch; Restrict updates, Restrict deletions, Block force pushes. Only the owner can update `main`, including by merging pull requests.
-2. **Branches: Claude's work branches only:** target all branches, excluding the default branch and `claude/**`; Restrict creations, Restrict updates, Restrict deletions. Nobody but the owner can make other branches.
+1. **Main: owner only:** target the default branch; Restrict updates, Restrict deletions, Block force pushes.
+2. **Branches: Claude's work branches only:** target all branches, excluding `main` and `claude/**`; Restrict creations, Restrict updates, Restrict deletions.
 
-Claude's GitHub app keeps write access, so it can push `claude/…` branches and open pull requests, but it can't update `main`. Collaborators: none. Use two-factor authentication on the owner's account.
+Only the repository admin (the owner) gets past these rules. Claude's GitHub app works as the owner, with the owner's agreement, so it can update the repository too. Anyone else with write access, other apps and keys are refused. To limit Claude to pull requests later, change Rule 1's bypass to **For pull requests only**, or remove Claude's app access between jobs. Keep two-factor authentication on the owner's account, since it is the only way in.
