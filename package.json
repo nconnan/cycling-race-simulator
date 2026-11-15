@@ -1,0 +1,13 @@
+{
+  "name": "cycling-race-simulator",
+  "version": "11.3.0",
+  "description": "Plan graded cycling races: predict catches, plan start gaps and print a race-day sheet.",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/core.test.js",
+    "test:ui": "node tests/ui.smoke.js",
+    "build": "node build.js",
+    "serve": "python3 -m http.server 8080"
+  },
+  "license": "UNLICENSED"
+}

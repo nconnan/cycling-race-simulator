@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Professional Cycling Race Simulator v11</title>
+<meta name="description" content="Plan graded cycling races: predict catches, plan start gaps and print a race-day sheet.">
+<meta name="theme-color" content="#f2f4f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#090d16" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Race Sim">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="appbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="16.5" r="3.5"/><circle cx="18.5" cy="16.5" r="3.5"/><path d="M5.5 16.5 9 9h6l3.5 7.5M9 9l3 7.5h-6.5M12 16.5 15 9M14 6h2.5"/></svg>
+    </div>
+    <div>
+      <div class="brand-title">Cycling Race Simulator <span class="ver">v11</span></div>
+      <div class="brand-sub">Graded race planning, catch prediction &amp; start-gap planner</div>
+    </div>
+  </div>
+  <div class="appbar-race" id="appbar-race">
+    <span class="live-dot"></span>
+    <span id="appbar-race-name">Cycling Race</span>
+    <span id="appbar-race-meta"></span>
+  </div>
+  <div class="appbar-actions">
+    <button class="btn" onclick="printRaceSheet()" title="Print the race-day sheet or save it as PDF">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/></svg>
+      <span class="lbl">Race sheet</span>
+    </button>
+    <button class="btn" onclick="openLibrary()" title="Saved races, open or download files">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <span class="lbl">Races</span>
+    </button>
+    <button class="btn" onclick="shareRace()" title="Share this race as a link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+      <span class="lbl">Share</span>
+    </button>
+    <button class="btn icon" id="themeToggle" onclick="toggleTheme()" title="Toggle light / dark theme" aria-label="Toggle theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+    <input type="file" id="loadFileInput" accept=".json,application/json" style="display:none;" onchange="handleRaceLoad(event)">
+    <input type="file" id="resultsFileInput" accept=".csv,.txt,text/csv" style="display:none;" onchange="handleResultsFile(event)">
+    <input type="file" id="gpxFileInput" accept=".gpx,application/gpx+xml" style="display:none;" onchange="handleGpxFile(event)">
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <section class="panel">
+      <button class="panel-head" onclick="toggleRaceConfigSection()" aria-controls="config-content">
+        <h2>Race setup</h2>
+        <span class="chev open" id="config-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg></span>
+      </button>
+      <div class="collapsible-content open" id="config-content">
+        <div class="field-grid">
+          <label class="field full">
+            <span class="field-label">Race name</span>
+            <input id="race-name" type="text" value="Cycling Race" onchange="handleRaceNameChange()">
+          </label>
+          <div class="field full">
+            <span class="field-label">Race type</span>
+            <div class="seg race-type-selector" role="group" aria-label="Race type">
+              <button class="race-type-btn active" onclick="setRaceType('circuit')" id="circuit-btn">Circuit</button>
+              <button class="race-type-btn" onclick="setRaceType('point')" id="point-btn">Point to point</button>
+              <button class="race-type-btn" onclick="setRaceType('outback')" id="outback-btn">Out &amp; back</button>
+            </div>
+          </div>
+          <label class="field">
+            <span class="field-label">Race start</span>
+            <input id="race-start-time" type="time" value="09:00" step="60" onchange="handleRaceStartTimeChange()">
+          </label>
+          <label class="field" id="distance-label">
+            <span class="field-label">Lap length</span>
+            <span class="input-unit"><input type="number" id="lap-length" value="2" min="0.1" max="50" step="0.1" onchange="handleLapLengthChange()"><span class="unit">km</span></span>
+          </label>
+          <div class="field full">
+            <span class="field-label">Course map</span>
+            <div class="course-row">
+              <span class="course-name" id="course-name">Standard shape</span>
+              <button type="button" class="btn sm" onclick="loadGpx()">Load GPX…</button>
+              <button type="button" class="btn sm" id="course-clear" onclick="clearCourse()" style="display:none">Remove</button>
+            </div>
+            <label class="check" id="hill-row" style="display:none"><input type="checkbox" id="hill-effect" checked onchange="handleHillToggle()"> Slower on climbs, faster on descents</label>
+            <span class="field-hint" id="course-hint"></span>
+          </div>
+          <div class="field full" id="direction-field">
+            <span class="field-label">Direction of travel</span>
+            <div class="seg" role="group" aria-label="Direction of travel">
+              <button class="dir-btn" data-dir="clockwise" onclick="setDirection('clockwise')">↻ Clockwise</button>
+              <button class="dir-btn" data-dir="anticlockwise" onclick="setDirection('anticlockwise')">↺ Anticlockwise</button>
+            </div>
+          </div>
+          <label class="field full">
+            <span class="field-label">When a grade is caught</span>
+            <select id="after-catch" onchange="handleAfterCatchChange()">
+              <option value="continue">Both grades carry on as before</option>
+              <option value="neutralise">Caught grade is neutralised (taken out)</option>
+              <option value="merge">Caught grade joins the catching bunch</option>
+            </select>
+            <span class="field-hint" id="after-catch-hint"></span>
+          </label>
+        </div>
+        <div class="panel-foot">
+          <button class="btn danger" onclick="resetAllSetup()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/></svg>
+            Reset all setup
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <button class="panel-head" onclick="toggleGradesSection()" aria-controls="grades-content">
+        <h2>Grades</h2><span class="count" id="grades-count">0</span>
+        <span class="chev open" id="grades-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg></span>
+      </button>
+      <div class="collapsible-content open" id="grades-content">
+        <form id="grade-form" onsubmit="event.preventDefault();"></form>
+      </div>
+    </section>
+  </aside>
+
+  <main class="main">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Live track</h2>
+          <div class="card-sub" id="track-sub"></div>
+        </div>
+        <div class="on-deck">
+          <span class="label">On course</span>
+          <div id="staging-area"></div>
+        </div>
+      </div>
+      <div class="track-wrap">
+        <canvas id="raceCanvas" width="960" height="500" aria-label="Race track"></canvas>
+        <div id="lap-counters"></div>
+        <div id="finish-flag" class="finish-flag"><span class="flag-icon"></span><span id="finish-grade-name"></span></div>
+      </div>
+      <div class="transport">
+        <div class="transport-buttons">
+          <button class="btn primary lg icon" id="playBtn" onclick="togglePlay()" title="Play / pause (Space)" aria-label="Play"></button>
+          <button class="btn lg icon" onclick="resetRace()" title="Reset race" aria-label="Reset race">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/></svg>
+          </button>
+        </div>
+        <div class="clock">
+          <span class="race-clock" id="raceTimeLabel">09:00</span>
+          <span class="clock-sub mono" id="raceElapsedLabel">+0:00:00</span>
+        </div>
+        <div class="scrub">
+          <input type="range" min="0" max="100" value="0" class="slider" id="raceSlider" aria-label="Scrub race time">
+          <div class="scrub-scale mono"><span id="scrub-start">09:00</span><span id="scrub-end">--:--</span></div>
+        </div>
+        <div class="speed-controls">
+          <div class="seg" role="group" aria-label="Playback speed">
+            <button onclick="setSpeed(0.5)" data-speed="0.5" class="speed-btn" title="Half speed">½×</button>
+            <button onclick="setSpeed(1)" data-speed="1" id="speed1x" class="speed-btn active">1×</button>
+            <button onclick="setSpeed(2)" data-speed="2" id="speed2x" class="speed-btn">2×</button>
+            <button onclick="setSpeed(4)" data-speed="4" id="speed4x" class="speed-btn">4×</button>
+            <button onclick="setSpeed(8)" data-speed="8" id="speed8x" class="speed-btn">8×</button>
+          </div>
+          <span class="playback-hint" id="playback-hint"></span>
+        </div>
+      </div>
+      <div class="kbd-hint"><kbd>Space</kbd> play / pause &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> scrub 1 min (<kbd>Shift</kbd> 5 min) &nbsp;·&nbsp; <kbd>Esc</kbd> close dialogs</div>
+    </section>
+
+    <section class="card">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="standings" onclick="showTab('standings')" role="tab">Standings</button>
+        <button class="tab" data-tab="catches" onclick="showTab('catches')" role="tab">Catch log <span class="count" id="catch-count">0</span></button>
+        <button class="tab" data-tab="risk" onclick="showTab('risk')" role="tab">Catch risk</button>
+        <button class="tab" data-tab="planner" onclick="showTab('planner')" role="tab">Start planner</button>
+        <button class="tab" data-tab="whatif" onclick="showTab('whatif')" role="tab">What-if</button>
+        <button class="tab" data-tab="summary" onclick="showTab('summary')" role="tab">Race summary <span class="ready-dot" id="summary-ready"></span></button>
+      </div>
+
+      <div class="tab-panel active" id="tab-standings">
+        <div id="finish-section"></div>
+      </div>
+
+      <div class="tab-panel" id="tab-catches">
+        <div class="table-wrap">
+          <table class="data" id="catchTable">
+            <thead>
+              <tr><th>Catcher</th><th>Caught</th><th>Time</th><th>Details</th><th>Position</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-risk">
+        <div class="callout" id="risk-intro"></div>
+        <div id="risk-result"></div>
+      </div>
+
+      <div class="tab-panel" id="tab-planner">
+        <div class="callout"><span>Suggests start times (or, with a fixed gap, lap counts) that keep your rule, and applies them to the race in one click. Every pair of grades is checked. With speed ranges allowed for, the plan must hold for the fastest and slowest speed in each grade's ± range. You can lock grades to their current start and set a time everyone must have finished by. Start times are whole minutes.</span></div>
+        <div class="planner-form">
+          <label class="field">
+            <span class="field-label">Method</span>
+            <select id="plan-method" onchange="updatePlannerForm()">
+              <option value="starts">Choose start times</option>
+              <option value="laps">Fixed gap, choose laps</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label" id="plan-order-label">Start order</span>
+            <select id="plan-order">
+              <option value="slowest">Slowest first (handicap)</option>
+              <option value="fastest">Fastest first</option>
+              <option value="current">Keep current order</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label" id="plan-gap-label">Minimum start gap</span>
+            <span class="input-unit"><input type="number" id="plan-gap" value="1" min="0" max="30" step="1"><span class="unit">min</span></span>
+          </label>
+          <div class="field wide">
+            <span class="field-label">Rule</span>
+            <div class="rule-row">
+              <select id="plan-rule" onchange="updatePlannerForm()">
+                <option value="none">No catches at all</option>
+                <option value="final">No catches in the final…</option>
+              </select>
+              <span class="input-unit" id="plan-n-wrap"><input type="number" id="plan-n" value="2" min="1" step="1"><span class="unit" id="plan-n-unit">laps</span></span>
+            </div>
+          </div>
+          <label class="field" id="plan-objective-field">
+            <span class="field-label">Aim</span>
+            <select id="plan-objective">
+              <option value="compact">Shortest overall race</option>
+              <option value="together">Finish close together</option>
+            </select>
+          </label>
+          <div class="field">
+            <span class="field-label">Speed ranges</span>
+            <label class="check"><input type="checkbox" id="plan-ranges" checked> Plan for the ± range of each grade</label>
+          </div>
+          <div class="field">
+            <span class="field-label">Finish deadline</span>
+            <div class="rule-row">
+              <label class="check" style="flex:none"><input type="checkbox" id="plan-deadline-on" onchange="updatePlannerForm()"> Finished by</label>
+              <input type="time" id="plan-deadline" value="11:00" step="60" disabled style="flex:1">
+            </div>
+            <label class="check" id="plan-cut-row" style="display:none"><input type="checkbox" id="plan-cut" checked> Cut laps to fit</label>
+          </div>
+          <div class="field full-row" id="plan-locks-field">
+            <span class="field-label">Keep the current start for</span>
+            <div class="lock-chips" id="plan-locks"></div>
+          </div>
+        </div>
+        <div class="planner-actions">
+          <button class="btn primary" onclick="runPlanner()">Suggest start times</button>
+          <span class="spacer"></span>
+          <button class="btn" id="plan-apply" onclick="applyPlan()" disabled>Apply to race</button>
+        </div>
+        <div id="plan-result"></div>
+      </div>
+
+      <div class="tab-panel" id="tab-whatif">
+        <div class="scenario-panel" id="scenario-panel">
+          <div class="panel-intro">
+            <p>Adjust grade speeds to see predicted outcomes. All adjustments are considered together, using the current after-catch setting; the live race is not changed.</p>
+            <button class="btn" onclick="resetScenarioAdjustments()">Reset adjustments</button>
+          </div>
+          <div class="scenario-grid" id="scenario-grid"></div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-summary">
+        <div class="summary-placeholder" id="summary-placeholder">
+          <strong>Summary not available yet</strong>
+          <span>Play or scrub the race to the end to see the full statistics.</span>
+        </div>
+        <div class="summary-section" id="summary-section" style="display:none;">
+          <div class="stat-row" id="summary-stats"></div>
+          <div class="table-wrap">
+            <table class="data" id="summaryTable">
+              <thead>
+                <tr>
+                  <th class="sortable sort-asc" onclick="sortSummaryTable(0)">Grade</th>
+                  <th class="sortable" onclick="sortSummaryTable(1)">Start Time</th>
+                  <th class="sortable" onclick="sortSummaryTable(2)">Finish Time</th>
+                  <th class="sortable" onclick="sortSummaryTable(3)">Duration</th>
+                  <th class="sortable" onclick="sortSummaryTable(4)">Avg Speed</th>
+                  <th class="sortable" onclick="sortSummaryTable(5)">Catches Made</th>
+                  <th class="sortable" onclick="sortSummaryTable(6)">Caught By</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer class="footer-section">
+  <div class="copyright">Copyright © <span id="copyright-year">2025</span> Nicholas Connan. All Rights Reserved.</div>
+  <div class="disclaimer">Disclaimer: This cycling race simulator is for conceptual planning and visualization purposes only. It does not provide accurate or reliable data on real-world race dynamics, environmental factors, or athlete performance and should be used with caution for actual race planning or decision-making.</div>
+</footer>
+
+<div id="toasts" aria-live="polite"></div>
+
+<div id="imageModal" class="modal-overlay" onclick="closeModal()">
+  <div class="modal-content" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalTitle">Catch Event Details</h3>
+      <button class="btn icon" style="margin-left:auto" onclick="closeModal()" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <img id="modalImage" class="modal-image" src="" alt="Race position at the catch">
+      <div class="modal-side">
+        <div class="modal-info" id="modalInfo"></div>
+        <div class="modal-legend" id="modalLegend"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="dialog" class="modal-overlay" onclick="closeDialog()">
+  <div class="modal-content dialog" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+    <div class="modal-header">
+      <h3 class="modal-title" id="dialogTitle"></h3>
+      <button class="btn icon" style="margin-left:auto" onclick="closeDialog()" aria-label="Close">✕</button>
+    </div>
+    <div class="dialog-body" id="dialogBody"></div>
+    <div class="dialog-foot" id="dialogFoot"></div>
+  </div>
+</div>
+
+<div id="print-sheet" aria-hidden="true"></div>
+
+<script src="js/core.js"></script>
+<script src="js/app.js"></script>
+<script>
+  // Offline support when served over http(s); skipped for a file opened from disk.
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+</script>
+</body>
+</html>
