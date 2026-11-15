@@ -633,3 +633,13 @@ select {
 .rv-catches > div { border: 1px solid var(--border); border-radius: 11px; padding: 10px 14px 12px; background: var(--surface-2); font-size: 13px; }
 .rv-catch { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 3px 0; }
 @media (max-width: 760px) { .rv-catches { grid-template-columns: 1fr; } }
+
+/* Course history */
+.grade-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.grade-tools .import-btn { margin-top: 8px; }
+.history-bar { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+.history-bar .field { min-width: 180px; }
+.spark { display: inline-flex; align-items: flex-end; gap: 2px; height: 20px; }
+.spark span { width: 5px; border-radius: 2px; background: var(--accent); opacity: .75; }
+.rv-start { height: 30px; width: 116px; font-size: 12.5px; }
+.rv-start.changed { border-color: var(--warn); }

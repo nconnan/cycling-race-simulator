@@ -672,6 +672,58 @@
     };
   }
 
+  /*
+   * A canonical key for a grade label, so the same grade matches across seasons:
+   *   "A", "A Grade", "MA", "M A", "A Men", "Men A"   → "A"
+   *   "WA", "W A", "Womens A", "A Women", "Women's A"  → "WA"
+   *   "E", "ME" → "E";  "Open", "M Open", "M_OPEN"   → "OPEN";  "W Open" → "WOPEN"
+   * Anything else (juniors, masters, age groups) is upper-cased with spaces and punctuation removed.
+   */
+  function gradeKey(label) {
+    let s = String(label || '').toUpperCase().replace(/[’'`]/g, '').replace(/[_\-–.]/g, ' ').replace(/\s+/g, ' ').trim();
+    s = s.replace(/\bGRADE\b/g, '').replace(/\s+/g, ' ').trim();
+    let m;
+    if ((m = s.match(/^(?:W|WOMENS?|WOMAN|FEMALE|F)\s*([A-E])$/)) || (m = s.match(/^([A-E])\s*(?:WOMENS?|WOMAN|FEMALE)$/))) return 'W' + m[1];
+    if ((m = s.match(/^(?:M|MENS?|MALE)?\s*([A-E])$/)) || (m = s.match(/^([A-E])\s*(?:MENS?|MALE)$/))) return m[1];
+    if (/^(?:M|MENS?)?\s*OPEN$/.test(s)) return 'OPEN';
+    if (/^(?:W|WOMENS?)\s*OPEN$/.test(s)) return 'WOPEN';
+    return s.replace(/[^A-Z0-9+]/g, '');
+  }
+
+  /*
+   * Suggested speed for one grade on one course from past races.
+   *   records: [{ date, speed, range }] for that grade on that course (any order)
+   *   recent:  how many of the latest races to use
+   * Returns { races, speed, range, spreadWithin, spreadBetween, trend, first, last } or null.
+   * The ± range covers both the spread inside a race and how much the grade varies race to race.
+   */
+  function historySuggestion(records, recent = 6) {
+    const rs = records.filter(r => r.speed > 0).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, recent);
+    if (!rs.length) return null;
+    const speeds = rs.map(r => r.speed).sort((a, b) => a - b);
+    const median = quantile(speeds, 0.5);
+    const within = quantile(rs.map(r => r.range || 0).sort((a, b) => a - b), 0.5);
+    const between = rs.length >= 3 ? (quantile(speeds, 0.9) - quantile(speeds, 0.1)) / 2 : 0;
+    const range = Math.max(0.5, Math.round(Math.sqrt(within * within + between * between) * 2) / 2);
+    // Trend: newest third against the rest (km/h), only with enough races
+    let trend = null;
+    if (rs.length >= 4) {
+      const k = Math.max(1, Math.round(rs.length / 3));
+      const avg = a => a.reduce((s, v) => s + v.speed, 0) / a.length;
+      trend = Math.round((avg(rs.slice(0, k)) - avg(rs.slice(k))) * 10) / 10;
+    }
+    return {
+      races: rs.length,
+      speed: Math.round(median * 10) / 10,
+      range,
+      spreadWithin: within,
+      spreadBetween: Math.round(between * 10) / 10,
+      trend,
+      first: rs[rs.length - 1].date,
+      last: rs[0].date
+    };
+  }
+
   // ---------- Course maps (GPX) and hills ----------
 
   function parseGpx(text) {
@@ -850,7 +902,7 @@
     finishClockOf, calculateCircuitCatches, calculateLinearCatch, findCatchEvents,
     simulateRace, stateAt, distanceAt, timeAtDistance, analyseRisk, planStarts,
     violatesRule, mulberry32, parseCsv, parseDuration, readResults, speedStats,
-    parseGpx, buildCourse, makeWarp, gradientFactor, signedArea, encodeShare, decodeShare
+    gradeKey, historySuggestion, parseGpx, buildCourse, makeWarp, gradientFactor, signedArea, encodeShare, decodeShare
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = SimCore;
   root.SimCore = SimCore;

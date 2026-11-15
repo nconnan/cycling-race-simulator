@@ -387,3 +387,47 @@ test('Sporthive: Midland Traders 100 (17.5 km lap) and a road race without lap s
   const st = C.speedStats(elite.riders, 0, 120);
   assert.ok(st.n === 19 && st.median > 30 && st.median < 45, `elite median ${st.median}`);
 });
+
+test('grade names from different seasons map to the same grade', () => {
+  const same = (labels, key) => labels.forEach(l => assert.equal(C.gradeKey(l), key, l));
+  same(['A', 'A Grade', 'MA', 'M A', 'A MEN', 'Men A', 'a grade'], 'A');
+  same(['WA', 'Womens A', "Women's A", 'A WOMEN', 'W A'], 'WA');
+  same(['E', 'ME'], 'E');
+  same(['OPEN', 'M_OPEN', 'Mens Open'], 'OPEN');
+  same(['W_OPEN', 'Womens Open'], 'WOPEN');
+  assert.equal(C.gradeKey('JM19'), 'JM19');
+  assert.equal(C.gradeKey('MMAS3'), 'MMAS3');
+});
+
+test('history suggestion: recent median, combined ± range and trend', () => {
+  const recs = [
+    { date: '2026-03-01', speed: 44, range: 0.5 }, { date: '2026-02-01', speed: 43, range: 0.5 },
+    { date: '2026-01-01', speed: 42, range: 0.5 }, { date: '2025-12-01', speed: 41, range: 0.5 },
+    { date: '2025-11-01', speed: 40, range: 0.5 }, { date: '2025-10-01', speed: 39, range: 0.5 },
+    { date: '2019-01-01', speed: 30, range: 0.5 }
+  ];
+  const s = C.historySuggestion(recs, 6);
+  assert.equal(s.races, 6, 'only the latest 6');
+  assert.equal(s.speed, 41.5);
+  assert.ok(s.range >= 2 && s.range <= 2.5, `range ${s.range} reflects race-to-race spread, not just ±0.5`);
+  assert.ok(s.trend > 2, 'getting faster');
+  assert.equal(s.last, '2026-03-01');
+  assert.equal(C.historySuggestion([], 6), null);
+  assert.equal(C.historySuggestion([{ date: 'x', speed: 40, range: 0.5 }], 6).range, 0.5);
+});
+
+test('built-in club history is well formed and has no names', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../js/history-data.js'), 'utf8');
+  const sandbox = { window: {} };
+  new Function('window', src)(sandbox.window);
+  const h = sandbox.window.BUILTIN_HISTORY;
+  assert.ok(h.races.length > 100);
+  for (const r of h.races) {
+    assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(r.d) && r.c && r.l > 0 && r.g.length);
+    for (const g of r.g) assert.ok(g.length === 6 && g[3] >= 10 && g[3] <= 70, JSON.stringify(g));
+  }
+  const smeaton = h.races.filter(r => r.c === 'Rockingham Smeaton Way');
+  const b = smeaton.flatMap(r => r.g.filter(g => C.gradeKey(g[0]) === 'B').map(g => ({ date: r.d, speed: g[3], range: g[4] })));
+  const s = C.historySuggestion(b, 6);
+  assert.ok(s.speed > 40 && s.speed < 46, `Smeaton B ${s.speed}`);
+});

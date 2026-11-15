@@ -94,6 +94,10 @@
             <label class="check" id="hill-row" style="display:none"><input type="checkbox" id="hill-effect" checked onchange="handleHillToggle()"> Slower on climbs, faster on descents</label>
             <span class="field-hint" id="course-hint"></span>
           </div>
+          <label class="field full">
+            <span class="field-label">Course for speed history</span>
+            <select id="history-course" onchange="setHistoryCourse(this.value)"><option value="">— none —</option></select>
+          </label>
           <div class="field full" id="direction-field">
             <span class="field-label">Direction of travel</span>
             <div class="seg" role="group" aria-label="Direction of travel">
@@ -186,6 +190,7 @@
         <button class="tab" data-tab="whatif" onclick="showTab('whatif')" role="tab">What-if</button>
         <button class="tab" data-tab="summary" onclick="showTab('summary')" role="tab">Race summary <span class="ready-dot" id="summary-ready"></span></button>
         <button class="tab" data-tab="review" onclick="showTab('review')" role="tab">Review <span class="ready-dot" id="review-ready"></span></button>
+        <button class="tab" data-tab="history" onclick="showTab('history')" role="tab">History</button>
       </div>
 
       <div class="tab-panel active" id="tab-standings">
@@ -286,6 +291,10 @@
         <div id="review-content"></div>
       </div>
 
+      <div class="tab-panel" id="tab-history">
+        <div id="history-content"></div>
+      </div>
+
       <div class="tab-panel" id="tab-summary">
         <div class="summary-placeholder" id="summary-placeholder">
           <strong>Summary not available yet</strong>
@@ -352,7 +361,16 @@
 <div id="print-sheet" aria-hidden="true"></div>
 
 <script src="js/core.js"></script>
-<script src="js/app.js"></script>
+<script src="js/history-data.js"></script>
+<script src="js/app/state.js"></script>
+<script src="js/app/race.js"></script>
+<script src="js/app/track.js"></script>
+<script src="js/app/tables.js"></script>
+<script src="js/app/planning.js"></script>
+<script src="js/app/library.js"></script>
+<script src="js/app/course-map.js"></script>
+<script src="js/app/review.js"></script>
+<script src="js/app/startup.js"></script>
 <script>
   // Offline support when served over http(s); skipped for a file opened from disk.
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {

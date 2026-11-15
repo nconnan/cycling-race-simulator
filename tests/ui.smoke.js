@@ -104,7 +104,7 @@ async function exercise(page, label) {
   const file = path.join(os.tmpdir(), `race-${Date.now()}.json`);
   await dl.saveAs(file);
   const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
-  check(saved.version === '11.4' && saved.afterCatch === 'merge' && saved.grades[1].range === 2.5, 'saved file has version, rule and ranges');
+  check(saved.version === '11.5' && saved.afterCatch === 'merge' && saved.grades[1].range === 2.5, 'saved file has version, rule and ranges');
   await page.evaluate(() => { document.getElementById('after-catch').value = 'continue'; handleAfterCatchChange(); });
   await page.setInputFiles('#loadFileInput', file);
   await page.waitForTimeout(300);
@@ -226,6 +226,25 @@ async function exercise(page, label) {
   check(/"review"/.test(saved4) && !/Rider \d/.test(saved4), 'review saved with the race, without riders\' names');
   await page.evaluate(() => applyReviewSpeeds());
   check(await page.evaluate(() => grades[0].spd === 42.4 && grades[1].spd === 40.5), 'speeds updated from the review');
+  await page.evaluate(() => resetAllSetup());
+
+  // ---- Course history ----
+  check(await page.evaluate(() => historyCourses().length > 10 && historyCourses()[0][0] === 'Rockingham Smeaton Way'), 'built-in club history loaded');
+  await page.evaluate(() => { openHistorySuggest(); historySuggestState.course = 'Rockingham Smeaton Way'; renderHistorySuggest(); applyHistorySuggest(); });
+  const hs = await page.evaluate(() => grades.map(g => [g.name, g.spd, g.range]));
+  check(hs[0][1] > 40 && hs[4][1] < 35 && hs.every(g => g[2] >= 0.5), `speeds from Smeaton Way history (${hs.map(g => g[0] + ' ' + g[1] + '±' + g[2]).join(', ')})`);
+  check(await page.evaluate(() => { showTab('history'); return document.querySelectorAll('#history-content tbody tr').length >= 5; }), 'history tab lists the grades');
+  // Review → actual start → add to history
+  await page.setInputFiles('#resultsFileInput', path.join(root, 'tests', 'fixtures', 'sporthive-pickering-brook.csv'));
+  await page.waitForFunction(() => document.getElementById('dialog').classList.contains('active'));
+  await page.evaluate(() => compareWithPlan());
+  const before5 = await page.evaluate(() => document.querySelector('#review-content tbody tr td:nth-child(8)').textContent);
+  await page.evaluate(() => setReviewStart(reviewState.groups.findIndex(g => g.label === 'MA'), toClock(grades[0].start + 5)));
+  const after5 = await page.evaluate(() => [document.querySelector('#review-content tbody tr td:nth-child(8)').textContent, reviewState.groups.find(g => g.label === 'MA').actualStart - grades[0].start]);
+  check(after5[1] === 5 && after5[0] !== before5, `actual start moves the actual finish (${before5} → ${after5[0]})`);
+  await page.evaluate(() => { openAddToHistory(); document.getElementById('hist-course-name').value = 'Pickering Brook'; document.getElementById('hist-date').value = '2026-09-20'; addReviewToHistory(); });
+  check(await page.evaluate(() => userHistory().length === 1 && historyCourses().some(([c]) => c === 'Pickering Brook') && historyFor('Pickering Brook', 'A')[0].speed === 42.4), 'reviewed race added to course history');
+  check(await page.evaluate(() => !/Rider \d/.test(JSON.stringify(userHistory()))), 'history has no riders\' names');
   await page.evaluate(() => resetAllSetup());
 
   // Playback: animation frames, smooth and course-aware

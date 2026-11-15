@@ -28,7 +28,11 @@ const script = p => {
 
 html = replaceOnce(html, '<link rel="stylesheet" href="css/app.css">', `<style>\n${css}\n</style>`);
 html = replaceOnce(html, '<script src="js/core.js"></script>', script('js/core.js'));
-html = replaceOnce(html, '<script src="js/app.js"></script>', script('js/app.js'));
+html = replaceOnce(html, '<script src="js/history-data.js"></script>', script('js/history-data.js'));
+for (const f of fs.readdirSync(path.join(root, 'js', 'app')).filter(f => f.endsWith('.js'))) {
+  html = replaceOnce(html, `<script src="js/app/${f}"></script>`, script(`js/app/${f}`));
+}
+if (/<script src="js\//.test(html)) throw new Error('build: a page script was not inlined');
 html = replaceOnce(html, '<link rel="manifest" href="manifest.webmanifest">\n', '');
 html = replaceOnce(html, 'href="icons/icon-192.png"', `href="${dataUri('icons/icon-192.png', 'image/png')}"`);
 html = replaceOnce(html, 'href="icons/apple-touch-icon.png"', `href="${dataUri('icons/apple-touch-icon.png', 'image/png')}"`);

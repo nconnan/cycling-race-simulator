@@ -14,6 +14,18 @@ Plan graded cycling races: predict when grades catch each other, plan start gaps
 - **Smooth playback**: markers are redrawn in step with the screen's refresh rate and leave a short fading trail. At 1×, playback slows down for short courses so the fastest grade takes about 8 seconds per lap (15 seconds per course for other race types). Long courses keep the old maximum rate. Speeds are ½×, 1×, 2×, 4× and 8×, and a line under the speed buttons shows how long the whole race takes to play.
 - **"On course" strip**: one fixed-height row that scrolls sideways, so the track no longer jumps when many grades are racing.
 
+## New in v11.5: course speed history
+
+- **Built-in club history:** speeds from 195 of Peel District Cycling Club's lap races on Sporthive, 2016–2026, across about 30 courses. It holds finishing speeds only, with no names (`js/history-data.js`).
+- **Course for speed history** (Race setup) and the **History** tab show, for each grade on a course:
+  - the suggested speed (median of the latest 3/6/10/20 races)
+  - a ± range that covers race-to-race variation as well as the spread within one race
+  - the trend, typical laps, the share of riders lapped or pulled, and a mini chart of recent races
+- **Speeds from history…** (under the grades) applies those speeds and ranges, and optionally the typical laps, to your grades. Grade names are matched across seasons: A = MA = "A Grade", and WA = "Womens A".
+- **Review** gains an **Actual start** time for each grade, so finish comparisons are right when a grade went off late, and **Add to course history** so your own reviewed races join the history. These are stored in your browser.
+
+Why the range matters: in the club's results a grade finishes within about ±0.5 km/h in one race, but varies about **±2 km/h from race to race**. Plan on the second figure.
+
 ## New in v11.4: post-race review
 
 1. After the race, open the event on **Sporthive / Speedhive** and download the results CSV. MyLaps Orbits exports work too, as does any results file with a grade and a time column.
@@ -66,7 +78,17 @@ When you change any app file, bump `VERSION` in `sw.js` so installed copies pick
 index.html               page markup
 css/app.css              styles (light/dark, print sheet)
 js/core.js               race engine: no DOM, fully tested (SimCore)
-js/app.js                page logic: UI, drawing, planner, sheet
+js/history-data.js       built-in club speed history (no names)
+js/app/                  page scripts, loaded in this order by index.html:
+  state.js                 shared state, helpers, theme, tabs
+  race.js                  race setup, grades, what-if, playback
+  track.js                 catch snapshots and drawing the track
+  tables.js                notifications, live tables, file save/load
+  planning.js              after-catch rules, catch risk, planner, race sheet, direction
+  library.js               race data, dialogs, library, share links, results import
+  course-map.js            GPX course maps and hills
+  review.js                post-race review and course history
+  startup.js               start-up (must stay last)
 sw.js                    offline cache (service worker)
 manifest.webmanifest     install metadata
 fonts/                   Inter and JetBrains Mono (SIL Open Font License)
