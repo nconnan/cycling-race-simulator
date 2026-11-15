@@ -70,7 +70,14 @@ Installing as an app needs the folder to be served over **https**. Browsers don'
 - **GitHub Pages:** push this folder to a GitHub repository's `main` branch and set *Settings → Pages → Source* to **GitHub Actions**. The included workflow (`.github/workflows/pages.yml`) runs the tests and publishes on every push. The app appears at `https://<user>.github.io/<repo>/`.
 - **Netlify Drop:** drag this folder onto <https://app.netlify.com/drop>.
 
-When you change any app file, bump `VERSION` in `sw.js` so installed copies pick up the update.
+### Releasing a new version
+
+The app shows its version and update date in the header (the badge next to the title), in the footer and on the race sheet. To release:
+
+1. In `js/app/state.js`, set `APP_VERSION` (major.minor.patch) and `APP_UPDATED` (YYYY-MM-DD).
+2. Set the same version in `package.json` and in `VERSION` in `sw.js`. The new cache version is what makes installed copies update.
+3. Update the version text in `index.html` (the `<title>`, the header badge and the footer line).
+4. Run `npm test`. It fails if any of these disagree.
 
 ## Project layout
 

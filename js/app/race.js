@@ -426,7 +426,7 @@ function updateHeaderMeta() {
   updateDirectionUI();
   document.getElementById('scrub-start').textContent = toClock(raceStartMinutes);
   document.getElementById('scrub-end').textContent = toClock(raceStartMinutes + raceMaxElapsed);
-  document.title = `${raceName} · Cycling Race Simulator v11`;
+  document.title = `${raceName} · Cycling Race Simulator v${APP_VERSION}`;
 }
 
 function updateCourseSetup() {

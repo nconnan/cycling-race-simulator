@@ -104,7 +104,7 @@ async function exercise(page, label) {
   const file = path.join(os.tmpdir(), `race-${Date.now()}.json`);
   await dl.saveAs(file);
   const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
-  check(saved.version === '11.5' && saved.afterCatch === 'merge' && saved.grades[1].range === 2.5, 'saved file has version, rule and ranges');
+  check(saved.version === await page.evaluate(() => APP_VERSION) && saved.afterCatch === 'merge' && saved.grades[1].range === 2.5, 'saved file has version, rule and ranges');
   await page.evaluate(() => { document.getElementById('after-catch').value = 'continue'; handleAfterCatchChange(); });
   await page.setInputFiles('#loadFileInput', file);
   await page.waitForTimeout(300);

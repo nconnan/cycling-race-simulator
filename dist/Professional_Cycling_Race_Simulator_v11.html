@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Professional Cycling Race Simulator v11</title>
+<title>Professional Cycling Race Simulator v11.5.1</title>
 <meta name="description" content="Plan graded cycling races: predict catches, plan start gaps and print a race-day sheet.">
 <meta name="theme-color" content="#f2f4f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#090d16" media="(prefers-color-scheme: dark)">
@@ -500,7 +500,8 @@ th.sort-desc::after { content: "↓"; opacity: 1; color: var(--accent); }
 
 /* ---------- Footer ---------- */
 .footer-section { max-width: 1640px; margin: 8px auto 0; padding: 20px 24px 32px; text-align: center; color: var(--muted); font-size: 12px; }
-.footer-section .copyright { font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+.footer-section .copyright { font-weight: 600; color: var(--text-2); margin-bottom: 4px; }
+.footer-section .app-version-line { font-variant-numeric: tabular-nums; margin-bottom: 8px; }
 .disclaimer { max-width: 820px; margin: 0 auto; line-height: 1.55; }
 
 /* ---------- Responsive ---------- */
@@ -670,7 +671,7 @@ select {
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="16.5" r="3.5"/><circle cx="18.5" cy="16.5" r="3.5"/><path d="M5.5 16.5 9 9h6l3.5 7.5M9 9l3 7.5h-6.5M12 16.5 15 9M14 6h2.5"/></svg>
     </div>
     <div>
-      <div class="brand-title">Cycling Race Simulator <span class="ver">v11</span></div>
+      <div class="brand-title">Cycling Race Simulator <span class="ver app-version" title="Version 11.5.1, updated 15 November 2026">v11.5.1</span></div>
       <div class="brand-sub">Graded race planning, catch prediction &amp; start-gap planner</div>
     </div>
   </div>
@@ -972,6 +973,7 @@ select {
 
 <footer class="footer-section">
   <div class="copyright">Copyright © <span id="copyright-year">2025</span> Nicholas Connan. All Rights Reserved.</div>
+  <div class="app-version-line">Version 11.5.1 · updated 15 November 2026</div>
   <div class="disclaimer">Disclaimer: This cycling race simulator is for conceptual planning and visualization purposes only. It does not provide accurate or reliable data on real-world race dynamics, environmental factors, or athlete performance and should be used with caution for actual race planning or decision-making.</div>
 </footer>
 
@@ -1927,9 +1929,17 @@ window.BUILTIN_HISTORY = {"source":"Peel District Cycling Club results on Sporth
 </script>
 <script>
 /*
- * Cycling Race Simulator v11 — page logic.
+ * Cycling Race Simulator — page logic.
  * The race maths lives in js/core.js (SimCore) and is covered by tests/core.test.js.
  */
+// Release version and date. Keep in step with package.json and sw.js (a test checks).
+const APP_VERSION = '11.5.1';
+const APP_UPDATED = '2026-11-15';
+
+function appUpdatedLabel() {
+  return new Date(APP_UPDATED + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
 const { toClock, toClockSec, fromClock, formatDuration, formatElapsed, formatSplit, finishClockOf } = SimCore;
 
 let grades = [], catches = [], finishers = [];
@@ -2586,7 +2596,7 @@ function updateHeaderMeta() {
   updateDirectionUI();
   document.getElementById('scrub-start').textContent = toClock(raceStartMinutes);
   document.getElementById('scrub-end').textContent = toClock(raceStartMinutes + raceMaxElapsed);
-  document.title = `${raceName} · Cycling Race Simulator v11`;
+  document.title = `${raceName} · Cycling Race Simulator v${APP_VERSION}`;
 }
 
 function updateCourseSetup() {
@@ -4222,7 +4232,7 @@ function buildRaceSheet() {
     ${catchEvents.length ? `<table><thead><tr><th>Time</th><th>Catcher</th><th>Caught</th><th>Type</th><th>Where</th></tr></thead><tbody>${catchRows}</tbody></table>` : '<p>No catches predicted at the planned speeds.</p>'}
     ${riskHTML}
     ${lapsHTML}
-    <div class="foot">Prepared with Cycling Race Simulator v11 on ${escapeHtml(today)}. Predictions assume steady speeds and are for planning only; they do not account for terrain, weather, crashes or race tactics.</div>
+    <div class="foot">Prepared with Cycling Race Simulator v${APP_VERSION} (updated ${appUpdatedLabel()}) on ${escapeHtml(today)}. Predictions assume steady speeds and are for planning only; they do not account for terrain, weather, crashes or race tactics.</div>
   </div>`;
 }
 
@@ -4310,7 +4320,7 @@ function buildRaceData(opts = {}) {
     scenarioAdjustments,
     review: reviewState,
     historyCourse,
-    version: '11.5'
+    version: APP_VERSION
   };
   if (!opts.lean) {
     // Snapshot images are regenerated on load, so they are not stored in the file.
@@ -5415,6 +5425,10 @@ function addReviewToHistory() {
    One of the page scripts in js/app/, loaded in order by index.html (see README). */
 
 // ---------- Start-up ----------
+
+// Show the version and update date (the HTML carries the same text for first paint).
+document.querySelectorAll('.app-version').forEach(el => { el.textContent = `v${APP_VERSION}`; el.title = `Version ${APP_VERSION}, updated ${appUpdatedLabel()}`; });
+document.querySelectorAll('.app-version-line').forEach(el => { el.textContent = `Version ${APP_VERSION} · updated ${appUpdatedLabel()}`; });
 
 setupCanvas();
 updateAfterCatchHint();

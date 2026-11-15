@@ -350,7 +350,7 @@ function buildRaceSheet() {
     ${catchEvents.length ? `<table><thead><tr><th>Time</th><th>Catcher</th><th>Caught</th><th>Type</th><th>Where</th></tr></thead><tbody>${catchRows}</tbody></table>` : '<p>No catches predicted at the planned speeds.</p>'}
     ${riskHTML}
     ${lapsHTML}
-    <div class="foot">Prepared with Cycling Race Simulator v11 on ${escapeHtml(today)}. Predictions assume steady speeds and are for planning only; they do not account for terrain, weather, crashes or race tactics.</div>
+    <div class="foot">Prepared with Cycling Race Simulator v${APP_VERSION} (updated ${appUpdatedLabel()}) on ${escapeHtml(today)}. Predictions assume steady speeds and are for planning only; they do not account for terrain, weather, crashes or race tactics.</div>
   </div>`;
 }
 

@@ -43,7 +43,7 @@ function buildRaceData(opts = {}) {
     scenarioAdjustments,
     review: reviewState,
     historyCourse,
-    version: '11.5'
+    version: APP_VERSION
   };
   if (!opts.lean) {
     // Snapshot images are regenerated on load, so they are not stored in the file.

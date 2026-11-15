@@ -3,6 +3,10 @@
 
 // ---------- Start-up ----------
 
+// Show the version and update date (the HTML carries the same text for first paint).
+document.querySelectorAll('.app-version').forEach(el => { el.textContent = `v${APP_VERSION}`; el.title = `Version ${APP_VERSION}, updated ${appUpdatedLabel()}`; });
+document.querySelectorAll('.app-version-line').forEach(el => { el.textContent = `Version ${APP_VERSION} · updated ${appUpdatedLabel()}`; });
+
 setupCanvas();
 updateAfterCatchHint();
 setupGradeInputs();

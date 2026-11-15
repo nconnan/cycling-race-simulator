@@ -431,3 +431,16 @@ test('built-in club history is well formed and has no names', () => {
   const s = C.historySuggestion(b, 6);
   assert.ok(s.speed > 40 && s.speed < 46, `Smeaton B ${s.speed}`);
 });
+
+test('version and update date agree everywhere', () => {
+  const read = p => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+  const app = read('js/app/state.js');
+  const version = app.match(/const APP_VERSION = '([\d.]+)'/)[1];
+  const updated = app.match(/const APP_UPDATED = '(\d{4}-\d{2}-\d{2})'/)[1];
+  assert.match(version, /^\d+\.\d+\.\d+$/, 'full major.minor.patch version');
+  assert.ok(!isNaN(Date.parse(updated)), 'valid update date');
+  assert.equal(JSON.parse(read('package.json')).version, version, 'package.json');
+  assert.equal(read('sw.js').match(/const VERSION = 'race-sim-v([\d.]+)'/)[1], version, 'sw.js cache version');
+  const html = read('index.html');
+  assert.ok(html.includes(`v${version}</span>`) && html.includes(`Version ${version} · updated`), 'index.html first-paint text');
+});
