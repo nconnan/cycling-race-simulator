@@ -1,6 +1,6 @@
 // Offline support: cache the app shell, serve it cache-first, refresh in the background.
 // Bump VERSION whenever any file below changes so installed apps pick up the update.
-const VERSION = 'race-sim-v11.7.1';
+const VERSION = 'race-sim-v11.7.2';
 const SHELL = [
   './',
   'index.html',
